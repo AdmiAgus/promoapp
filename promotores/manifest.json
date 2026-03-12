@@ -1,0 +1,23 @@
+{
+  "name": "Igualdad Salud",
+  "short_name": "IG Salud",
+  "description": "Sistema de promotores Igualdad Salud",
+  "start_url": "/promotores/",
+  "scope": "/promotores/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0086B8",
+  "icons": [
+    {
+      "src": "/promotores/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/promotores/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
