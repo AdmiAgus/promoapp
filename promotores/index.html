@@ -410,7 +410,8 @@ const IconLogout = () => (
 )
 
 // ── DNI VALIDATION ──
-const API_BASE = 'http://ssh.ccomisiones.com:9000'
+const AUTH_BASE = 'http://192.168.2.122:9000/auth'
+const API_BASE = 'http://192.168.2.122:9000'
 // En preview del artifact usamos mock por CORS — en producción poner false
 const MOCK_DNI = false
 
@@ -496,14 +497,19 @@ function LoginScreen({ onLogin }) {
     setFieldErrs({})
     setLoading(true)
     setErr('')
-    await new Promise(r => setTimeout(r, 500))
-    const u = MOCK_USERS[user.toLowerCase()]
-    if (!u || u.pass !== pass) {
-      setErr('Usuario o contraseña incorrectos')
-      setLoading(false)
-      return
+    try {
+      const res = await fetch(AUTH_BASE + '/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario: user.trim(), pass })
+      })
+      const data = await res.json()
+      if (!res.ok) { setErr(data.detail || 'Error al ingresar'); setLoading(false); return }
+      localStorage.setItem('ig_session', JSON.stringify(data))
+      onLogin(data)
+    } catch {
+      setErr('No se pudo conectar al servidor')
     }
-    onLogin({ usuario: user.toLowerCase(), nombre: u.nombre })
     setLoading(false)
   }
 
