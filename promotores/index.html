@@ -370,25 +370,6 @@ const css = `
   .ig-admin-cta p { font-size: 12px; opacity: 0.8; margin-top: 2px; font-family: 'DM Sans', sans-serif; }
 
 
-  /* ADMIN */
-  .ig-admin-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 10px; }
-  .ig-user-row { display: flex; align-items: center; padding: 14px 16px; border-bottom: 1px solid #F1F5F9; gap: 12px; }
-  .ig-user-row:last-child { border-bottom: none; }
-  .ig-user-avatar { width: 40px; height: 40px; border-radius: 10px; background: #E0F5FD; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; font-weight: 700; color: #0086B8; font-family: 'DM Mono', monospace; }
-  .ig-user-info { flex: 1; min-width: 0; }
-  .ig-user-nombre { font-size: 14px; font-weight: 600; color: #1E293B; }
-  .ig-user-usuario { font-size: 12px; color: #94A3B8; margin-top: 2px; }
-  .ig-toggle { width: 44px; height: 26px; border-radius: 100px; border: none; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; }
-  .ig-toggle-on { background: #10B981; }
-  .ig-toggle-off { background: #CBD5E1; }
-  .ig-toggle::after { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 3px; transition: left 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
-  .ig-toggle-on::after { left: 21px; }
-  .ig-toggle-off::after { left: 3px; }
-  .ig-admin-cta { background: linear-gradient(135deg, #7C3AED, #5B21B6); border-radius: 16px; padding: 20px 22px; color: white; cursor: pointer; box-shadow: 0 4px 16px rgba(124,58,237,0.3); border: none; width: 100%; text-align: left; transition: transform 0.15s; display: flex; align-items: center; gap: 14px; }
-  .ig-admin-cta:active { transform: scale(0.98); }
-  .ig-admin-cta-icon { font-size: 28px; flex-shrink: 0; }
-  .ig-admin-cta h3 { font-size: 16px; font-weight: 700; font-family: 'DM Sans', sans-serif; }
-  .ig-admin-cta p { font-size: 12px; opacity: 0.8; margin-top: 2px; font-family: 'DM Sans', sans-serif; }
 
   /* LOGIN ERR */
   .ig-login-err { background: #FEE2E2; color: #991B1B; border-radius: 8px; padding: 10px 12px; font-size: 13px; font-weight: 500; margin-bottom: 12px; }
@@ -413,6 +394,35 @@ const IconLogout = () => (
 const AUTH_BASE = 'http://192.168.2.122:9000/auth'
 const API_BASE = 'http://192.168.2.122:9000'
 // En preview del artifact usamos mock por CORS — en producción poner false
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzWFYTz0M0YEliE1fn7luflLLVSTY559owOjftU2xIO8ZpJuHcDyzz7SCVSyW4tegUt/exec'
+
+async function enviarASheets(dato, usuario) {
+  const session = JSON.parse(localStorage.getItem('ig_session') || '{}')
+  const nombreHoja = ((session.apellido || '') + ' ' + (session.nombre || '')).trim().toUpperCase() || ('APP_' + (usuario || 'PROMOTOR').toUpperCase())
+  const payload = {
+    jid: nombreHoja,
+    payload: {
+      tipo_dato: dato.tipo,
+      nombre_final: dato.nombre,
+      numero: dato.numero,
+      dni_final: dato.dni,
+      obra_social: dato.obraSocial,
+      horario: dato.horario,
+      grupo_fliar: dato.grupoFliar,
+      empresa: dato.empresa,
+      localidad: dato.localidad,
+      obs: dato.obs,
+    }
+  }
+  await fetch(SHEETS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  return true
+}
+
 const MOCK_DNI = false
 
 function normalizarTexto(t) {
@@ -1111,7 +1121,34 @@ function App() {
   const toastTimer = useRef(null)
 
   useEffect(() => {
-    const update = () => setIsOnline(navigator.onLine)
+    const session = localStorage.getItem('ig_session')
+    if (session) {
+      try {
+        const data = JSON.parse(session)
+        setUser(data)
+        setScreen('home')
+      } catch {}
+    }
+  }, [])
+
+  useEffect(() => {
+    const update = async () => {
+      const online = navigator.onLine
+      setIsOnline(online)
+      if (online) {
+        const pendientes = JSON.parse(localStorage.getItem('ig_pendientes') || '[]')
+        if (pendientes.length > 0) {
+          let enviados = 0
+          for (const dato of pendientes) {
+            try { await enviarASheets(dato, dato.usuario); enviados++ } catch {}
+          }
+          if (enviados > 0) {
+            localStorage.removeItem('ig_pendientes')
+            showToast('✓ ' + enviados + ' dato(s) sincronizado(s)')
+          }
+        }
+      }
+    }
     window.addEventListener('online', update)
     window.addEventListener('offline', update)
     update()
@@ -1133,15 +1170,32 @@ function App() {
   }
 
   const handleLogout = () => {
+    localStorage.removeItem('ig_session')
     setUser(null)
     setDatos([])
     setScreen('login')
   }
 
-  const handleSave = (dato) => {
-    setDatos(d => [dato, ...d])
+  const handleSave = async (dato) => {
+    const datoConUsuario = { ...dato, usuario: user?.usuario }
+    setDatos(d => [datoConUsuario, ...d])
     setScreen('home')
-    showToast(isOnline ? '✓ Dato guardado y enviado' : '💾 Guardado — se enviará al conectar')
+    if (isOnline) {
+      try {
+        await enviarASheets(datoConUsuario, user?.usuario)
+        showToast('✓ Dato guardado y enviado a Drive')
+      } catch {
+        const pendientes = JSON.parse(localStorage.getItem('ig_pendientes') || '[]')
+        pendientes.push(datoConUsuario)
+        localStorage.setItem('ig_pendientes', JSON.stringify(pendientes))
+        showToast('⚠ Error al enviar — guardado para reintentar')
+      }
+    } else {
+      const pendientes = JSON.parse(localStorage.getItem('ig_pendientes') || '[]')
+      pendientes.push(datoConUsuario)
+      localStorage.setItem('ig_pendientes', JSON.stringify(pendientes))
+      showToast('💾 Sin conexión — se enviará al conectar')
+    }
   }
 
   return (
@@ -1174,13 +1228,6 @@ function App() {
           <DetailScreen
             dato={detailDato}
             onBack={() => setScreen('home')}
-          />
-        )}
-        {screen === 'admin' && (
-          <AdminScreen
-            user={user}
-            onBack={() => setScreen('home')}
-            showToast={showToast}
           />
         )}
         {screen === 'admin' && (
