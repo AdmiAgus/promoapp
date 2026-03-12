@@ -20,7 +20,7 @@
 // ── CONFIG MOCK ──
 const MOCK_USERS = {
   'promotor1': { pass: '1234', nombre: 'Carlos Gómez' },
-  'promotor2': { pass: '1234', nombre: 'Ana Rodríguez' },
+  'alex': { pass: '1234', nombre: 'Alex Peralta' },
   'admin':     { pass: 'admin', nombre: 'Admin' },
 }
 
@@ -324,51 +324,6 @@ const css = `
   }
   .ig-offline.show { transform: translateX(-50%) translateY(0); }
 
-
-  /* ADMIN */
-  .ig-admin-card {
-    background: white; border-radius: 16px; overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 10px;
-  }
-  .ig-user-row {
-    display: flex; align-items: center; padding: 14px 16px;
-    border-bottom: 1px solid #F1F5F9; gap: 12px;
-  }
-  .ig-user-row:last-child { border-bottom: none; }
-  .ig-user-avatar {
-    width: 40px; height: 40px; border-radius: 10px;
-    background: #E0F5FD; display: flex; align-items: center;
-    justify-content: center; font-size: 16px; flex-shrink: 0;
-    font-weight: 700; color: #0086B8; font-family: 'DM Mono', monospace;
-  }
-  .ig-user-info { flex: 1; min-width: 0; }
-  .ig-user-nombre { font-size: 14px; font-weight: 600; color: #1E293B; }
-  .ig-user-usuario { font-size: 12px; color: #94A3B8; margin-top: 2px; }
-  .ig-toggle {
-    width: 44px; height: 26px; border-radius: 100px; border: none;
-    cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0;
-  }
-  .ig-toggle-on { background: #10B981; }
-  .ig-toggle-off { background: #CBD5E1; }
-  .ig-toggle::after {
-    content: ''; position: absolute; width: 20px; height: 20px;
-    background: white; border-radius: 50%; top: 3px;
-    transition: left 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-  }
-  .ig-toggle-on::after { left: 21px; }
-  .ig-toggle-off::after { left: 3px; }
-  .ig-admin-cta {
-    background: linear-gradient(135deg, #7C3AED, #5B21B6);
-    border-radius: 16px; padding: 20px 22px; color: white;
-    cursor: pointer; box-shadow: 0 4px 16px rgba(124,58,237,0.3);
-    border: none; width: 100%; text-align: left; transition: transform 0.15s;
-    display: flex; align-items: center; gap: 14px;
-  }
-  .ig-admin-cta:active { transform: scale(0.98); }
-  .ig-admin-cta-icon { font-size: 28px; flex-shrink: 0; }
-  .ig-admin-cta h3 { font-size: 16px; font-weight: 700; font-family: 'DM Sans', sans-serif; }
-  .ig-admin-cta p { font-size: 12px; opacity: 0.8; margin-top: 2px; font-family: 'DM Sans', sans-serif; }
-
   /* LOGIN ERR */
   .ig-login-err { background: #FEE2E2; color: #991B1B; border-radius: 8px; padding: 10px 12px; font-size: 13px; font-weight: 500; margin-bottom: 12px; }
 `
@@ -389,9 +344,37 @@ const IconLogout = () => (
 )
 
 // ── DNI VALIDATION ──
-const API_BASE = 'http://ssh.ccomisiones.com:9000'
+const AUTH_BASE = 'http://192.168.2.122:9000/auth'
+const API_BASE = 'http://192.168.2.122:9000'
 // En preview del artifact usamos mock por CORS — en producción poner false
 const MOCK_DNI = false
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzWFYTz0M0YEliE1fn7luflLLVSTY559owOjftU2xIO8ZpJuHcDyzz7SCVSyW4tegUt/exec'
+
+async function enviarASheets(dato, usuario) {
+  const payload = {
+    jid: 'APP_' + (usuario || 'PROMOTOR').toUpperCase(),
+    payload: {
+      tipo_dato: dato.tipo,
+      nombre_final: dato.nombre,
+      numero: dato.numero,
+      dni_final: dato.dni,
+      obra_social: dato.obraSocial,
+      horario: dato.horario,
+      grupo_fliar: dato.grupoFliar,
+      empresa: dato.empresa,
+      localidad: dato.localidad,
+      obs: dato.obs,
+    }
+  }
+  await fetch(SHEETS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  return true
+}
+
 
 function normalizarTexto(t) {
   if (!t) return ''
@@ -467,24 +450,29 @@ function LoginScreen({ onLogin }) {
   const [err, setErr] = useState('')
   const [fieldErrs, setFieldErrs] = useState({})
 
-  const handleLogin = async () => {
-    const errs = {}
-    if (!user.trim()) errs.user = 'Ingresá tu usuario'
-    if (!pass) errs.pass = 'Ingresá tu contraseña'
-    if (Object.keys(errs).length) { setFieldErrs(errs); return }
-    setFieldErrs({})
-    setLoading(true)
-    setErr('')
-    await new Promise(r => setTimeout(r, 500))
-    const u = MOCK_USERS[user.toLowerCase()]
-    if (!u || u.pass !== pass) {
-      setErr('Usuario o contraseña incorrectos')
-      setLoading(false)
-      return
-    }
-    onLogin({ usuario: user.toLowerCase(), nombre: u.nombre })
-    setLoading(false)
+const handleLogin = async () => {
+  const errs = {}
+  if (!user.trim()) errs.user = 'Ingresá tu usuario'
+  if (!pass) errs.pass = 'Ingresá tu contraseña'
+  if (Object.keys(errs).length) { setFieldErrs(errs); return }
+  setFieldErrs({})
+  setLoading(true)
+  setErr('')
+  try {
+    const res = await fetch(`${AUTH_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario: user.trim(), pass })
+    })
+    const data = await res.json()
+    if (!res.ok) { setErr(data.detail || 'Error al ingresar'); setLoading(false); return }
+    localStorage.setItem('ig_session', JSON.stringify(data))
+    onLogin(data)
+  } catch {
+    setErr('No se pudo conectar al servidor')
   }
+  setLoading(false)
+}
 
   return (
     <div className="ig-login">
@@ -520,7 +508,7 @@ function LoginScreen({ onLogin }) {
   )
 }
 
-function HomeScreen({ user, datos, isOnline, onNuevo, onVerDato, onLogout, onSync, onAdmin }) {
+function HomeScreen({ user, datos, isOnline, onNuevo, onVerDato, onLogout, onSync }) {
   const today = new Date().toDateString()
   const hoy = datos.filter(d => new Date(d.ts).toDateString() === today).length
   const pendientes = datos.filter(d => d.status === 'pending').length
@@ -565,16 +553,6 @@ function HomeScreen({ user, datos, isOnline, onNuevo, onVerDato, onLogout, onSyn
           <h3>Nuevo dato</h3>
           <p>Cargar cliente nuevo</p>
         </button>
-
-        {user.esAdmin && (
-          <button className="ig-admin-cta" onClick={onAdmin}>
-            <div className="ig-admin-cta-icon">👥</div>
-            <div>
-              <h3>Gestión de usuarios</h3>
-              <p>Crear y administrar promotores</p>
-            </div>
-          </button>
-        )}
 
         <div className="ig-sync-row" onClick={onSync}>
           <div className={`ig-sync-dot ${isOnline ? 'ig-dot-online' : 'ig-dot-offline'}`} />
@@ -779,24 +757,24 @@ function FormScreen({ onBack, onSave, isOnline }) {
       <div className="ig-content">
         {/* CLIENTE */}
         <div className="ig-form-section">
-          <div className="ig-form-section-title">👤 Cliente</div>
+          <div className="ig-form-section-title">👤 Datos</div>
           <div className="ig-field">
             <label>Nombre completo *</label>
             <input className={errs.nombre?'err':''} value={form.nombre}
-              onChange={e=>set('nombre',e.target.value)} placeholder="Ej: García Juan Carlos" />
+              onChange={e=>set('nombre',e.target.value)} placeholder="Alex" />
             {errs.nombre && <div className="ig-err-msg">{errs.nombre}</div>}
           </div>
           <div className="ig-field">
             <label>Teléfono *</label>
             <input className={errs.numero?'err':''} value={form.numero}
-              onChange={e=>set('numero',e.target.value)} placeholder="Ej: 3415678901"
+              onChange={e=>set('numero',e.target.value)} placeholder="1123456789"
               inputMode="numeric" maxLength={12} />
             {errs.numero && <div className="ig-err-msg">{errs.numero}</div>}
           </div>
           <div className="ig-field">
             <label>DNI</label>
             <input className={errs.dni?'err':''} value={form.dni}
-              onChange={e=>set('dni',e.target.value)} placeholder="Ej: 42156789"
+              onChange={e=>set('dni',e.target.value)} placeholder="40123456"
               inputMode="numeric" maxLength={8} />
             {renderDniStatus()}
             {errs.dni && <div className="ig-err-msg">{errs.dni}</div>}
@@ -809,13 +787,13 @@ function FormScreen({ onBack, onSave, isOnline }) {
           <div className="ig-field">
             <label>Obra social *</label>
             <input className={errs.obraSocial?'err':''} value={form.obraSocial}
-              onChange={e=>set('obraSocial',e.target.value)} placeholder="Ej: OSDE, Swiss Medical..." />
+              onChange={e=>set('obraSocial',e.target.value)} placeholder="Osmedica, Ospatrones..." />
             {errs.obraSocial && <div className="ig-err-msg">{errs.obraSocial}</div>}
           </div>
           <div className="ig-field">
             <label>Grupo familiar</label>
             <input value={form.grupoFliar} onChange={e=>set('grupoFliar',e.target.value)}
-              placeholder="Ej: Titular + cónyuge + 2 hijos" />
+              placeholder="2" />
           </div>
         </div>
 
@@ -825,7 +803,7 @@ function FormScreen({ onBack, onSave, isOnline }) {
           <div className="ig-field">
             <label>Horario</label>
             <input value={form.horario} onChange={e=>set('horario',e.target.value)}
-              placeholder="Ej: Mañanas, después de 18hs..." />
+              placeholder="15hs, a la mañana..." />
           </div>
           <div className="ig-field">
             <label>Empresa</label>
@@ -933,149 +911,11 @@ function DetailScreen({ dato, onBack }) {
   )
 }
 
-
-function AdminScreen({ user, onBack, showToast }) {
-  const [usuarios, setUsuarios] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ apellido: '', nombre: '', usuario: '', pass: '' })
-  const [formErr, setFormErr] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const token = JSON.parse(localStorage.getItem('ig_session') || '{}').token
-
-  const cargarUsuarios = async () => {
-    try {
-      const res = await fetch(`${AUTH_BASE}/users`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await res.json()
-      if (data.ok) setUsuarios(data.usuarios)
-    } catch {}
-    setLoading(false)
-  }
-
-  useEffect(() => { cargarUsuarios() }, [])
-
-  const toggleUsuario = async (u) => {
-    try {
-      await fetch(`${AUTH_BASE}/users/${u.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ activo: !u.activo })
-      })
-      setUsuarios(prev => prev.map(x => x.id === u.id ? {...x, activo: !x.activo} : x))
-      showToast(u.activo ? '⛔ Usuario desactivado' : '✓ Usuario activado')
-    } catch { showToast('⚠ Error al actualizar') }
-  }
-
-  const crearUsuario = async () => {
-    const ap = form.apellido.trim().toUpperCase()
-    const nom = form.nombre.trim().toUpperCase()
-    const us = form.usuario.trim().toLowerCase().replace(/\s+/g, '')
-    const pw = form.pass.trim()
-    if (!ap || !nom || !us || !pw) { setFormErr('Completá todos los campos'); return }
-    setSaving(true)
-    setFormErr('')
-    try {
-      const res = await fetch(`${AUTH_BASE}/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ apellido: ap, nombre: nom, usuario: us, pass: pw })
-      })
-      const data = await res.json()
-      if (!res.ok) { setFormErr(data.detail || 'Error al crear'); setSaving(false); return }
-      setShowForm(false)
-      setForm({ apellido: '', nombre: '', usuario: '', pass: '' })
-      showToast('✓ Usuario creado')
-      cargarUsuarios()
-    } catch { setFormErr('Error de conexión') }
-    setSaving(false)
-  }
-
-  const initials = (u) => ((u.apellido?.[0] || '') + (u.nombre?.[0] || '')).toUpperCase() || '?'
-
-  return (
-    <div>
-      <div className="ig-topbar">
-        <div className="ig-topbar-inner">
-          <div className="ig-topbar-left">
-            <TopbarLogo />
-            <div>
-              <div className="ig-topbar-sub">Igualdad Salud</div>
-              <h2>Gestión de usuarios</h2>
-            </div>
-          </div>
-          <button className="ig-topbar-btn" onClick={onBack}><IconBack /></button>
-        </div>
-      </div>
-
-      <div className="ig-content">
-        <button className="ig-btn ig-btn-primary" onClick={() => setShowForm(true)} style={{marginBottom:4}}>
-          + Nuevo usuario
-        </button>
-
-        {loading
-          ? <div className="ig-empty"><div className="ig-spinner" style={{margin:'0 auto'}}/></div>
-          : <div className="ig-admin-card">
-              {usuarios.length === 0
-                ? <div style={{padding:'20px',textAlign:'center',color:'#94A3B8',fontSize:14}}>No hay usuarios</div>
-                : usuarios.map(u => (
-                    <div key={u.id} className="ig-user-row">
-                      <div className="ig-user-avatar">{initials(u)}</div>
-                      <div className="ig-user-info">
-                        <div className="ig-user-nombre">{u.apellido} {u.nombre}</div>
-                        <div className="ig-user-usuario">@{u.usuario}{u.esAdmin ? ' · admin' : ''}</div>
-                      </div>
-                      <button
-                        className={`ig-toggle ${u.activo ? 'ig-toggle-on' : 'ig-toggle-off'}`}
-                        onClick={() => toggleUsuario(u)}
-                        disabled={u.usuario === user.usuario}
-                      />
-                    </div>
-                  ))
-              }
-            </div>
-        }
-      </div>
-
-      {showForm && (
-        <div className="ig-overlay">
-          <div className="ig-overlay-sheet">
-            <h3>Nuevo usuario</h3>
-            {formErr && <div style={{background:'#FEE2E2',color:'#991B1B',borderRadius:8,padding:'10px 12px',fontSize:13,marginBottom:12}}>{formErr}</div>}
-            <div className="ig-field">
-              <label>Apellido</label>
-              <input value={form.apellido} onChange={e=>setForm(f=>({...f,apellido:e.target.value}))} placeholder="García" autoCapitalize="words" />
-            </div>
-            <div className="ig-field">
-              <label>Nombre</label>
-              <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Juan" autoCapitalize="words" />
-            </div>
-            <div className="ig-field">
-              <label>Usuario</label>
-              <input value={form.usuario} onChange={e=>setForm(f=>({...f,usuario:e.target.value}))} placeholder="juan.garcia" autoCapitalize="none" />
-            </div>
-            <div className="ig-field" style={{marginBottom:20}}>
-              <label>Contraseña</label>
-              <input type="password" value={form.pass} onChange={e=>setForm(f=>({...f,pass:e.target.value}))} placeholder="••••••••" />
-            </div>
-            <button className="ig-btn ig-btn-success" onClick={crearUsuario} disabled={saving} style={{marginBottom:10}}>
-              {saving ? <><div className="ig-spinner ig-spinner-white"/> Guardando...</> : '✓ Crear usuario'}
-            </button>
-            <button className="ig-btn ig-btn-secondary" onClick={() => { setShowForm(false); setFormErr('') }}>Cancelar</button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ══════════════════════════════════════════
 // ROOT APP
 // ══════════════════════════════════════════
 function App() {
-  const [screen, setScreen] = useState('login') // login | home | form | detail | admin
+  const [screen, setScreen] = useState('login') // login | home | form | detail
   const [user, setUser] = useState(null)
   const [datos, setDatos] = useState([])
   const [isOnline, setIsOnline] = useState(true)
@@ -1083,16 +923,47 @@ function App() {
   const [toast, setToast] = useState({ msg: '', show: false })
   const toastTimer = useRef(null)
 
+useEffect(() => {
+  const session = localStorage.getItem('ig_session')
+  if (session) {
+    try {
+      const data = JSON.parse(session)
+      setUser(data)
+      setScreen('home')
+    } catch {}
+  }
+}, [])
+
   useEffect(() => {
-    const update = () => setIsOnline(navigator.onLine)
-    window.addEventListener('online', update)
-    window.addEventListener('offline', update)
-    update()
-    return () => {
-      window.removeEventListener('online', update)
-      window.removeEventListener('offline', update)
+  const update = async () => {
+    const online = navigator.onLine
+    setIsOnline(online)
+    if (online) {
+      const pendientes = JSON.parse(localStorage.getItem('ig_pendientes') || '[]')
+      if (pendientes.length > 0) {
+        let enviados = 0
+        for (const dato of pendientes) {
+          try {
+            await enviarASheets(dato, dato.usuario)
+            enviados++
+          } catch {}
+        }
+        if (enviados > 0) {
+          localStorage.removeItem('ig_pendientes')
+          showToast(`✓ ${enviados} dato(s) sincronizado(s)`)
+        }
+      }
     }
-  }, [])
+  }
+  
+  window.addEventListener('online', update)
+  window.addEventListener('offline', update)
+  update()
+  return () => {
+    window.removeEventListener('online', update)
+    window.removeEventListener('offline', update)
+  }
+}, [])
 
   const showToast = (msg) => {
     clearTimeout(toastTimer.current)
@@ -1105,17 +976,33 @@ function App() {
     setScreen('home')
   }
 
-  const handleLogout = () => {
-    setUser(null)
-    setDatos([])
-    setScreen('login')
+const handleLogout = () => {
+  localStorage.removeItem('ig_session')
+  setUser(null)
+  setDatos([])
+  setScreen('login')
+}
+const handleSave = async (dato) => {
+  const datoConUsuario = { ...dato, usuario: user?.usuario }
+  setDatos(d => [datoConUsuario, ...d])
+  setScreen('home')
+  if (isOnline) {
+    try {
+      await enviarASheets(datoConUsuario, user?.usuario)
+      showToast('✓ Dato guardado y enviado a Drive')
+    } catch {
+      const pendientes = JSON.parse(localStorage.getItem('ig_pendientes') || '[]')
+      pendientes.push(datoConUsuario)
+      localStorage.setItem('ig_pendientes', JSON.stringify(pendientes))
+      showToast('⚠ Error al enviar — guardado para reintentar')
+    }
+  } else {
+    const pendientes = JSON.parse(localStorage.getItem('ig_pendientes') || '[]')
+    pendientes.push(datoConUsuario)
+    localStorage.setItem('ig_pendientes', JSON.stringify(pendientes))
+    showToast('💾 Sin conexión — se enviará al conectar')
   }
-
-  const handleSave = (dato) => {
-    setDatos(d => [dato, ...d])
-    setScreen('home')
-    showToast(isOnline ? '✓ Dato guardado y enviado' : '💾 Guardado — se enviará al conectar')
-  }
+}
 
   return (
     <>
@@ -1132,7 +1019,6 @@ function App() {
             onNuevo={() => setScreen('form')}
             onVerDato={(d) => { setDetailDato(d); setScreen('detail') }}
             onLogout={handleLogout}
-            onAdmin={() => setScreen('admin')}
             onSync={() => showToast(isOnline ? '🔄 Sincronizando...' : '⚡ Sin conexión')}
           />
         )}
@@ -1147,13 +1033,6 @@ function App() {
           <DetailScreen
             dato={detailDato}
             onBack={() => setScreen('home')}
-          />
-        )}
-        {screen === 'admin' && (
-          <AdminScreen
-            user={user}
-            onBack={() => setScreen('home')}
-            showToast={showToast}
           />
         )}
 
