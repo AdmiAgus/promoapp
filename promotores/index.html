@@ -344,7 +344,8 @@ const IconLogout = () => (
 )
 
 // ── DNI VALIDATION ──
-const API_BASE = '/api'
+const AUTH_BASE = 'https://ssh.ccomisiones.com/auth'
+const API_BASE = 'http://192.168.2.122/api'
 // En preview del artifact usamos mock por CORS — en producción poner false
 const MOCK_DNI = false
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzWFYTz0M0YEliE1fn7luflLLVSTY559owOjftU2xIO8ZpJuHcDyzz7SCVSyW4tegUt/exec'
@@ -449,24 +450,29 @@ function LoginScreen({ onLogin }) {
   const [err, setErr] = useState('')
   const [fieldErrs, setFieldErrs] = useState({})
 
-  const handleLogin = async () => {
-    const errs = {}
-    if (!user.trim()) errs.user = 'Ingresá tu usuario'
-    if (!pass) errs.pass = 'Ingresá tu contraseña'
-    if (Object.keys(errs).length) { setFieldErrs(errs); return }
-    setFieldErrs({})
-    setLoading(true)
-    setErr('')
-    await new Promise(r => setTimeout(r, 500))
-    const u = MOCK_USERS[user.toLowerCase()]
-    if (!u || u.pass !== pass) {
-      setErr('Usuario o contraseña incorrectos')
-      setLoading(false)
-      return
-    }
-    onLogin({ usuario: user.toLowerCase(), nombre: u.nombre })
-    setLoading(false)
+const handleLogin = async () => {
+  const errs = {}
+  if (!user.trim()) errs.user = 'Ingresá tu usuario'
+  if (!pass) errs.pass = 'Ingresá tu contraseña'
+  if (Object.keys(errs).length) { setFieldErrs(errs); return }
+  setFieldErrs({})
+  setLoading(true)
+  setErr('')
+  try {
+    const res = await fetch(`${AUTH_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario: user.trim(), pass })
+    })
+    const data = await res.json()
+    if (!res.ok) { setErr(data.detail || 'Error al ingresar'); setLoading(false); return }
+    localStorage.setItem('ig_session', JSON.stringify(data))
+    onLogin(data)
+  } catch {
+    setErr('No se pudo conectar al servidor')
   }
+  setLoading(false)
+}
 
   return (
     <div className="ig-login">
@@ -917,6 +923,17 @@ function App() {
   const [toast, setToast] = useState({ msg: '', show: false })
   const toastTimer = useRef(null)
 
+useEffect(() => {
+  const session = localStorage.getItem('ig_session')
+  if (session) {
+    try {
+      const data = JSON.parse(session)
+      setUser(data)
+      setScreen('home')
+    } catch {}
+  }
+}, [])
+
   useEffect(() => {
   const update = async () => {
     const online = navigator.onLine
@@ -938,6 +955,7 @@ function App() {
       }
     }
   }
+  
   window.addEventListener('online', update)
   window.addEventListener('offline', update)
   update()
@@ -958,12 +976,12 @@ function App() {
     setScreen('home')
   }
 
-  const handleLogout = () => {
-    setUser(null)
-    setDatos([])
-    setScreen('login')
-  }
-
+const handleLogout = () => {
+  localStorage.removeItem('ig_session')
+  setUser(null)
+  setDatos([])
+  setScreen('login')
+}
 const handleSave = async (dato) => {
   const datoConUsuario = { ...dato, usuario: user?.usuario }
   setDatos(d => [datoConUsuario, ...d])
