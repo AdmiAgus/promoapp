@@ -25,12 +25,19 @@ const MOCK_USERS = {
 }
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2) }
-function formatDateShort(ts) {
+function formatDateShort(ts, fechaStr, horaStr) {
+  const hora = horaStr || new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+  if (fechaStr) {
+    const todayCheck = (() => {
+      const n = new Date()
+      return String(n.getDate()).padStart(2,'0') + '/' + String(n.getMonth()+1).padStart(2,'0') + '/' + String(n.getFullYear()).slice(-2)
+    })()
+    return fechaStr.trim() === todayCheck ? `Hoy ${hora}` : fechaStr + ` ${hora}`
+  }
   const d = new Date(ts)
   const today = new Date()
   const isToday = d.toDateString() === today.toDateString()
-  const time = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-  return isToday ? `Hoy ${time}` : d.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit' }) + ` ${time}`
+  return isToday ? `Hoy ${hora}` : d.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit' }) + ` ${hora}`
 }
 function formatDate(ts) {
   const d = new Date(ts)
@@ -618,9 +625,15 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
   const [pagina, setPagina] = useState(1)
   const [totalPaginas, setTotalPaginas] = useState(1)
   const [cargando, setCargando] = useState(false)
-  const todayStr = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'2-digit'})
+  const todayStr = (() => {
+    const n = new Date()
+    const d = String(n.getDate()).padStart(2,'0')
+    const m = String(n.getMonth()+1).padStart(2,'0')
+    const y = String(n.getFullYear()).slice(-2)
+    return d + '/' + m + '/' + y
+  })()
   const hoy = datos.filter(d => {
-    if (d.fechaStr) return d.fechaStr === todayStr
+    if (d.fechaStr) return d.fechaStr.trim() === todayStr
     return new Date(d.ts).toDateString() === today
   }).length
   const pendientes = datos.filter(d => d.status === 'pending').length
@@ -638,11 +651,7 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
       const vistos = new Set()
       setDatos(todo.filter(d => { if (vistos.has(d.id)) return false; vistos.add(d.id); return true }))
     } else {
-      setDatos(prev => {
-        const todo = [...prev, ...sheetDatos]
-        const vistos = new Set()
-        return todo.filter(d => { if (vistos.has(d.id)) return false; vistos.add(d.id); return true })
-      })
+      setDatos(sheetDatos)
     }
     setCargando(false)
   }
@@ -728,23 +737,42 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
                   <div className="ig-dato-avatar">👤</div>
                   <div className="ig-dato-info">
                     <div className="ig-dato-nombre">{d.nombre}</div>
-                    <div className="ig-dato-sub">{formatDateShort(d.ts)} · {d.numero}</div>
+                    <div className="ig-dato-sub">{formatDateShort(d.ts, d.fechaStr, d.horaStr)} · {d.numero}</div>
                   </div>
                   <span className={badgeClass(d)}>{badgeText(d)}</span>
                 </div>
               ))
           }
-          {totalPaginas > pagina && (
-            <button
-              onClick={() => { const p = pagina + 1; setPagina(p); cargarPagina(p) }}
-              disabled={cargando}
-              style={{
-                width:'100%', padding:'12px', background:'white', border:'2px solid #E2E8F0',
-                borderRadius:'10px', fontFamily:'DM Sans,sans-serif', fontSize:13,
-                fontWeight:600, color:'#475569', cursor:'pointer', marginTop:4
+          {totalPaginas > 1 && (
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginTop:4}}>
+              <button
+                onClick={() => { const p = Math.max(1, pagina-1); setPagina(p); cargarPagina(p) }}
+                disabled={pagina <= 1 || cargando}
+                style={{
+                  width:40, height:40, border:'2px solid #E2E8F0', borderRadius:10,
+                  background:'white', fontFamily:'DM Sans,sans-serif', fontSize:16,
+                  fontWeight:700, color: pagina <= 1 ? '#CBD5E1' : '#475569',
+                  cursor: pagina <= 1 ? 'default' : 'pointer', display:'flex',
+                  alignItems:'center', justifyContent:'center'
+                }}>‹</button>
+              <div style={{
+                background:'white', border:'2px solid #E2E8F0', borderRadius:10,
+                padding:'0 14px', height:40, display:'flex', alignItems:'center',
+                fontSize:13, fontWeight:600, color:'#475569', gap:4
               }}>
-              {cargando ? 'Cargando...' : 'Cargar más datos'}
-            </button>
+                {cargando ? <div className="ig-spinner"/> : <span>{pagina} / {totalPaginas}</span>}
+              </div>
+              <button
+                onClick={() => { const p = Math.min(totalPaginas, pagina+1); setPagina(p); cargarPagina(p) }}
+                disabled={pagina >= totalPaginas || cargando}
+                style={{
+                  width:40, height:40, border:'2px solid #E2E8F0', borderRadius:10,
+                  background:'white', fontFamily:'DM Sans,sans-serif', fontSize:16,
+                  fontWeight:700, color: pagina >= totalPaginas ? '#CBD5E1' : '#475569',
+                  cursor: pagina >= totalPaginas ? 'default' : 'pointer', display:'flex',
+                  alignItems:'center', justifyContent:'center'
+                }}>›</button>
+            </div>
           )}
         </div>
       </div>
