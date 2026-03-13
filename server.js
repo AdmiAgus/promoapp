@@ -6,14 +6,14 @@ const app = express();
 
 // 1. Proxy para Autenticación (/auth/)
 app.use('/auth/', createProxyMiddleware({ 
-    target: 'http://192.168.2.122:9000', 
+    target: 'http://192.168.68.141:9000', 
     changeOrigin: true 
 }));
 
 // 2. Proxy para API (/api/)
 // pathRewrite quita el prefijo /api para que el backend reciba la ruta limpia [cite: 92, 93]
 app.use('/api/', createProxyMiddleware({ 
-    target: 'http://192.168.2.122:9000', 
+    target: 'http://192.168.68.141:9000', 
     changeOrigin: true,
     pathRewrite: { '^/api': '' } 
 }));
