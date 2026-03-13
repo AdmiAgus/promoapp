@@ -371,6 +371,17 @@ const css = `
 
 
 
+
+  /* STATS ADMIN */
+  .ig-stats-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  .ig-stats-row { display: flex; align-items: center; padding: 13px 16px; border-bottom: 1px solid #F1F5F9; gap: 12px; }
+  .ig-stats-row:last-child { border-bottom: none; }
+  .ig-stats-nombre { flex: 1; font-size: 14px; font-weight: 600; color: #1E293B; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ig-stats-nums { display: flex; gap: 12px; flex-shrink: 0; }
+  .ig-stats-num { text-align: center; }
+  .ig-stats-num .val { font-size: 18px; font-weight: 700; color: #00AEEF; font-family: 'DM Mono', monospace; line-height: 1; }
+  .ig-stats-num .lbl { font-size: 9px; color: #94A3B8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+
   /* LOGIN ERR */
   .ig-login-err { background: #FEE2E2; color: #991B1B; border-radius: 8px; padding: 10px 12px; font-size: 13px; font-weight: 500; margin-bottom: 12px; }
 `
@@ -399,8 +410,8 @@ const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzWFYTz0M0YEliE1fn7l
 async function enviarASheets(dato, usuario) {
   const session = JSON.parse(localStorage.getItem('ig_session') || '{}')
   const nombreHoja = ((session.apellido || '') + ' ' + (session.nombre || '')).trim().toUpperCase() || ('APP_' + (usuario || 'PROMOTOR').toUpperCase())
-  const payload = {
-    jid: nombreHoja,
+  const buildPayload = (jid) => ({
+    jid,
     payload: {
       tipo_dato: dato.tipo,
       nombre_final: dato.nombre,
@@ -413,17 +424,38 @@ async function enviarASheets(dato, usuario) {
       localidad: dato.localidad,
       obs: dato.obs,
     }
-  }
-  await fetch(SHEETS_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
   })
+  const opts = { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' } }
+  // Enviar a hoja personal y a GRAL en paralelo
+  await Promise.all([
+    fetch(SHEETS_URL, { ...opts, body: JSON.stringify(buildPayload(nombreHoja)) }),
+    fetch(SHEETS_URL, { ...opts, body: JSON.stringify(buildPayload('GRAL')) }),
+  ])
   return true
 }
 
 const MOCK_DNI = false
+
+
+async function leerDatosDeSheet(nombreHoja) {
+  try {
+    const url = SHEETS_URL + '?action=getDatos&hoja=' + encodeURIComponent(nombreHoja)
+    const res = await fetch(url)
+    const data = await res.json()
+    if (data.ok) return data.datos
+  } catch {}
+  return []
+}
+
+async function leerStats() {
+  try {
+    const url = SHEETS_URL + '?action=getStats'
+    const res = await fetch(url)
+    const data = await res.json()
+    if (data.ok) return data.stats
+  } catch {}
+  return []
+}
 
 function normalizarTexto(t) {
   if (!t) return ''
@@ -557,11 +589,27 @@ function LoginScreen({ onLogin }) {
   )
 }
 
-function HomeScreen({ user, datos, isOnline, onNuevo, onVerDato, onLogout, onSync, onAdmin }) {
+function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLogout, onSync, onAdmin }) {
   const today = new Date().toDateString()
   const hoy = datos.filter(d => new Date(d.ts).toDateString() === today).length
   const pendientes = datos.filter(d => d.status === 'pending').length
   const recientes = [...datos].sort((a, b) => b.ts - a.ts).slice(0, 10)
+
+  useEffect(() => {
+    if (!isOnline) return
+    const nombreHoja = ((user.apellido || '') + ' ' + (user.nombre || '')).trim().toUpperCase()
+    leerDatosDeSheet(nombreHoja).then(sheetDatos => {
+      if (sheetDatos.length > 0) {
+        // Mezclar con pendientes locales (pendientes tienen prioridad)
+        const pendientesLocales = JSON.parse(localStorage.getItem('ig_pendientes') || '[]')
+        const todo = [...pendientesLocales, ...sheetDatos]
+        // Deduplicar por id
+        const vistos = new Set()
+        const dedup = todo.filter(d => { if (vistos.has(d.id)) return false; vistos.add(d.id); return true })
+        setDatos(dedup)
+      }
+    })
+  }, [isOnline])
 
   const badgeClass = (d) => {
     if (d.status === 'pending') return 'ig-badge ig-badge-pending'
@@ -971,6 +1019,42 @@ function DetailScreen({ dato, onBack }) {
 }
 
 
+
+function StatsPanel() {
+  const [stats, setStats] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    leerStats().then(s => { setStats(s); setLoading(false) })
+  }, [])
+
+  if (loading) return <div style={{textAlign:'center',padding:'20px'}}><div className="ig-spinner" style={{margin:'0 auto'}}/></div>
+  if (stats.length === 0) return null
+
+  return (
+    <div>
+      <div className="ig-section-title">Estadísticas</div>
+      <div className="ig-stats-card">
+        {stats.map((s, i) => (
+          <div key={i} className="ig-stats-row">
+            <div className="ig-stats-nombre">{s.nombre}</div>
+            <div className="ig-stats-nums">
+              <div className="ig-stats-num">
+                <div className="val">{s.hoy}</div>
+                <div className="lbl">Hoy</div>
+              </div>
+              <div className="ig-stats-num">
+                <div className="val">{s.total}</div>
+                <div className="lbl">Total</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function AdminScreen({ user, onBack, showToast }) {
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1048,6 +1132,8 @@ function AdminScreen({ user, onBack, showToast }) {
       </div>
 
       <div className="ig-content">
+        <StatsPanel />
+
         <button className="ig-btn ig-btn-primary" onClick={() => setShowForm(true)} style={{marginBottom:4}}>
           + Nuevo usuario
         </button>
@@ -1126,6 +1212,9 @@ function App() {
       try {
         const data = JSON.parse(session)
         setUser(data)
+        // Restaurar datos guardados
+        const datosGuardados = localStorage.getItem('ig_datos_' + data.usuario)
+        if (datosGuardados) setDatos(JSON.parse(datosGuardados))
         setScreen('home')
       } catch {}
     }
@@ -1139,11 +1228,28 @@ function App() {
         const pendientes = JSON.parse(localStorage.getItem('ig_pendientes') || '[]')
         if (pendientes.length > 0) {
           let enviados = 0
+          const idsSincronizados = []
           for (const dato of pendientes) {
-            try { await enviarASheets(dato, dato.usuario); enviados++ } catch {}
+            try {
+              await enviarASheets(dato, dato.usuario)
+              enviados++
+              idsSincronizados.push(dato.id)
+            } catch {}
           }
           if (enviados > 0) {
-            localStorage.removeItem('ig_pendientes')
+            const pendientesRestantes = pendientes.filter(d => !idsSincronizados.includes(d.id))
+            if (pendientesRestantes.length === 0) {
+              localStorage.removeItem('ig_pendientes')
+            } else {
+              localStorage.setItem('ig_pendientes', JSON.stringify(pendientesRestantes))
+            }
+            // Actualizar status en el array de datos
+            setDatos(prev => {
+              const updated = prev.map(d => idsSincronizados.includes(d.id) ? {...d, status: 'sent'} : d)
+              const session = JSON.parse(localStorage.getItem('ig_session') || '{}')
+              if (session.usuario) localStorage.setItem('ig_datos_' + session.usuario, JSON.stringify(updated.slice(0, 50)))
+              return updated
+            })
             showToast('✓ ' + enviados + ' dato(s) sincronizado(s)')
           }
         }
@@ -1178,7 +1284,11 @@ function App() {
 
   const handleSave = async (dato) => {
     const datoConUsuario = { ...dato, usuario: user?.usuario }
-    setDatos(d => [datoConUsuario, ...d])
+    setDatos(d => {
+      const nuevo = [datoConUsuario, ...d]
+      localStorage.setItem('ig_datos_' + user?.usuario, JSON.stringify(nuevo.slice(0, 50)))
+      return nuevo
+    })
     setScreen('home')
     if (isOnline) {
       try {
@@ -1209,7 +1319,7 @@ function App() {
         {screen === 'login' && <LoginScreen onLogin={handleLogin} />}
         {screen === 'home' && (
           <HomeScreen
-            user={user} datos={datos} isOnline={isOnline}
+            user={user} datos={datos} setDatos={setDatos} isOnline={isOnline}
             onNuevo={() => setScreen('form')}
             onVerDato={(d) => { setDetailDato(d); setScreen('detail') }}
             onLogout={handleLogout}
