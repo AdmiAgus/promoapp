@@ -382,6 +382,28 @@ const css = `
   .ig-stats-num .val { font-size: 18px; font-weight: 700; color: #00AEEF; font-family: 'DM Mono', monospace; line-height: 1; }
   .ig-stats-num .lbl { font-size: 9px; color: #94A3B8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
 
+
+  /* STATS */
+  .ig-stats-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  .ig-stats-row { display: flex; align-items: center; padding: 13px 16px; border-bottom: 1px solid #F1F5F9; gap: 12px; }
+  .ig-stats-row:last-child { border-bottom: none; }
+  .ig-stats-nombre { flex: 1; font-size: 14px; font-weight: 600; color: #1E293B; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ig-stats-nums { display: flex; gap: 16px; flex-shrink: 0; }
+  .ig-stats-num { text-align: center; min-width: 36px; }
+  .ig-stats-num .val { font-size: 20px; font-weight: 700; color: #00AEEF; font-family: 'DM Mono', monospace; line-height: 1; }
+  .ig-stats-num .lbl { font-size: 9px; color: #94A3B8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+  .ig-stats-cta {
+    background: linear-gradient(135deg, #10B981, #059669);
+    border-radius: 16px; padding: 20px 22px; color: white;
+    cursor: pointer; box-shadow: 0 4px 16px rgba(16,185,129,0.3);
+    border: none; width: 100%; text-align: left; transition: transform 0.15s;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .ig-stats-cta:active { transform: scale(0.98); }
+  .ig-stats-cta-icon { font-size: 28px; flex-shrink: 0; }
+  .ig-stats-cta h3 { font-size: 16px; font-weight: 700; font-family: 'DM Sans', sans-serif; }
+  .ig-stats-cta p { font-size: 12px; opacity: 0.8; margin-top: 2px; font-family: 'DM Sans', sans-serif; }
+
   /* LOGIN ERR */
   .ig-login-err { background: #FEE2E2; color: #991B1B; border-radius: 8px; padding: 10px 12px; font-size: 13px; font-weight: 500; margin-bottom: 12px; }
 `
@@ -410,8 +432,9 @@ const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzWFYTz0M0YEliE1fn7l
 async function enviarASheets(dato, usuario) {
   const session = JSON.parse(localStorage.getItem('ig_session') || '{}')
   const nombreHoja = ((session.apellido || '') + ' ' + (session.nombre || '')).trim().toUpperCase() || ('APP_' + (usuario || 'PROMOTOR').toUpperCase())
-  const buildPayload = (jid) => ({
+  const buildPayload = (jid, promotor) => ({
     jid,
+    promotor: promotor || '',
     payload: {
       tipo_dato: dato.tipo,
       nombre_final: dato.nombre,
@@ -428,8 +451,8 @@ async function enviarASheets(dato, usuario) {
   const opts = { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' } }
   // Enviar a hoja personal y a GRAL en paralelo
   await Promise.all([
-    fetch(SHEETS_URL, { ...opts, body: JSON.stringify(buildPayload(nombreHoja)) }),
-    fetch(SHEETS_URL, { ...opts, body: JSON.stringify(buildPayload('GRAL')) }),
+    fetch(SHEETS_URL, { ...opts, body: JSON.stringify(buildPayload(nombreHoja, '')) }),
+    fetch(SHEETS_URL, { ...opts, body: JSON.stringify(buildPayload('GRAL', nombreHoja)) }),
   ])
   return true
 }
@@ -437,14 +460,15 @@ async function enviarASheets(dato, usuario) {
 const MOCK_DNI = false
 
 
-async function leerDatosDeSheet(nombreHoja) {
+async function leerDatosDeSheet(nombreHoja, pagina) {
   try {
-    const url = SHEETS_URL + '?action=getDatos&hoja=' + encodeURIComponent(nombreHoja)
+    const p = pagina || 1
+    const url = SHEETS_URL + '?action=getDatos&hoja=' + encodeURIComponent(nombreHoja) + '&pagina=' + p
     const res = await fetch(url)
     const data = await res.json()
-    if (data.ok) return data.datos
+    if (data.ok) return { datos: data.datos, totalPaginas: data.totalPaginas || 1 }
   } catch {}
-  return []
+  return { datos: [], totalPaginas: 1 }
 }
 
 async function leerStats() {
@@ -582,34 +606,48 @@ function LoginScreen({ onLogin }) {
           {loading ? <><div className="ig-spinner ig-spinner-white"/>&nbsp;Ingresando...</> : 'Ingresar'}
         </button>
         <div style={{marginTop:16,fontSize:12,color:'#94A3B8',textAlign:'center'}}>
-          Demo: <b>version</b> / <b>1</b>
+          Demo: <b>promotor1</b> / <b>1234</b>
         </div>
       </div>
     </div>
   )
 }
 
-function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLogout, onSync, onAdmin }) {
+function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLogout, onSync, onAdmin, onStats }) {
   const today = new Date().toDateString()
-  const hoy = datos.filter(d => new Date(d.ts).toDateString() === today).length
+  const [pagina, setPagina] = useState(1)
+  const [totalPaginas, setTotalPaginas] = useState(1)
+  const [cargando, setCargando] = useState(false)
+  const todayStr = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'2-digit'})
+  const hoy = datos.filter(d => {
+    if (d.fechaStr) return d.fechaStr === todayStr
+    return new Date(d.ts).toDateString() === today
+  }).length
   const pendientes = datos.filter(d => d.status === 'pending').length
-  const recientes = [...datos].sort((a, b) => b.ts - a.ts).slice(0, 10)
+  const recientes = [...datos].sort((a, b) => b.ts - a.ts)
 
-  useEffect(() => {
+  const cargarPagina = async (p) => {
     if (!isOnline) return
+    setCargando(true)
     const nombreHoja = ((user.apellido || '') + ' ' + (user.nombre || '')).trim().toUpperCase()
-    leerDatosDeSheet(nombreHoja).then(sheetDatos => {
-      if (sheetDatos.length > 0) {
-        // Mezclar con pendientes locales (pendientes tienen prioridad)
-        const pendientesLocales = JSON.parse(localStorage.getItem('ig_pendientes') || '[]')
-        const todo = [...pendientesLocales, ...sheetDatos]
-        // Deduplicar por id
+    const { datos: sheetDatos, totalPaginas: tp } = await leerDatosDeSheet(nombreHoja, p)
+    setTotalPaginas(tp)
+    if (p === 1) {
+      const pendientesLocales = JSON.parse(localStorage.getItem('ig_pendientes') || '[]')
+      const todo = [...pendientesLocales, ...sheetDatos]
+      const vistos = new Set()
+      setDatos(todo.filter(d => { if (vistos.has(d.id)) return false; vistos.add(d.id); return true }))
+    } else {
+      setDatos(prev => {
+        const todo = [...prev, ...sheetDatos]
         const vistos = new Set()
-        const dedup = todo.filter(d => { if (vistos.has(d.id)) return false; vistos.add(d.id); return true })
-        setDatos(dedup)
-      }
-    })
-  }, [isOnline])
+        return todo.filter(d => { if (vistos.has(d.id)) return false; vistos.add(d.id); return true })
+      })
+    }
+    setCargando(false)
+  }
+
+  useEffect(() => { if (isOnline) cargarPagina(1) }, [isOnline])
 
   const badgeClass = (d) => {
     if (d.status === 'pending') return 'ig-badge ig-badge-pending'
@@ -660,6 +698,15 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
             </div>
           </button>
         )}
+        {user.esAdmin && (
+          <button className="ig-stats-cta" onClick={onStats}>
+            <div className="ig-stats-cta-icon">📊</div>
+            <div>
+              <h3>Estadísticas</h3>
+              <p>Rendimiento del equipo</p>
+            </div>
+          </button>
+        )}
 
         <div className="ig-sync-row" onClick={onSync}>
           <div className={`ig-sync-dot ${isOnline ? 'ig-dot-online' : 'ig-dot-offline'}`} />
@@ -687,6 +734,18 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
                 </div>
               ))
           }
+          {totalPaginas > pagina && (
+            <button
+              onClick={() => { const p = pagina + 1; setPagina(p); cargarPagina(p) }}
+              disabled={cargando}
+              style={{
+                width:'100%', padding:'12px', background:'white', border:'2px solid #E2E8F0',
+                borderRadius:'10px', fontFamily:'DM Sans,sans-serif', fontSize:13,
+                fontWeight:600, color:'#475569', cursor:'pointer', marginTop:4
+              }}>
+              {cargando ? 'Cargando...' : 'Cargar más datos'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1020,7 +1079,8 @@ function DetailScreen({ dato, onBack }) {
 
 
 
-function StatsPanel() {
+
+function StatsScreen({ onBack }) {
   const [stats, setStats] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -1028,28 +1088,40 @@ function StatsPanel() {
     leerStats().then(s => { setStats(s); setLoading(false) })
   }, [])
 
-  if (loading) return <div style={{textAlign:'center',padding:'20px'}}><div className="ig-spinner" style={{margin:'0 auto'}}/></div>
-  if (stats.length === 0) return null
-
   return (
     <div>
-      <div className="ig-section-title">Estadísticas</div>
-      <div className="ig-stats-card">
-        {stats.map((s, i) => (
-          <div key={i} className="ig-stats-row">
-            <div className="ig-stats-nombre">{s.nombre}</div>
-            <div className="ig-stats-nums">
-              <div className="ig-stats-num">
-                <div className="val">{s.hoy}</div>
-                <div className="lbl">Hoy</div>
-              </div>
-              <div className="ig-stats-num">
-                <div className="val">{s.total}</div>
-                <div className="lbl">Total</div>
-              </div>
+      <div className="ig-topbar">
+        <div className="ig-topbar-inner">
+          <div className="ig-topbar-left">
+            <TopbarLogo />
+            <div>
+              <div className="ig-topbar-sub">Igualdad Salud</div>
+              <h2>Estadísticas</h2>
             </div>
           </div>
-        ))}
+          <button className="ig-topbar-btn" onClick={onBack}><IconBack /></button>
+        </div>
+      </div>
+      <div className="ig-content">
+        {loading
+          ? <div className="ig-empty"><div className="ig-spinner" style={{margin:'0 auto'}}/></div>
+          : stats.length === 0
+            ? <div className="ig-empty"><div className="ig-empty-icon">📊</div><p>No hay datos en ALIAS</p></div>
+            : <div style={{background:'white',borderRadius:16,overflow:'hidden',boxShadow:'0 2px 8px rgba(0,0,0,0.05)'}}>
+                <div style={{display:'flex',padding:'10px 16px',borderBottom:'1px solid #F1F5F9',gap:12}}>
+                  <div style={{flex:1,fontSize:11,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'0.5px'}}>Promotor</div>
+                  <div style={{fontSize:11,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'0.5px',minWidth:36,textAlign:'center'}}>Hoy</div>
+                  <div style={{fontSize:11,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'0.5px',minWidth:48,textAlign:'center'}}>Total</div>
+                </div>
+                {stats.map((s, i) => (
+                  <div key={i} style={{display:'flex',alignItems:'center',padding:'13px 16px',borderBottom:i<stats.length-1?'1px solid #F1F5F9':'none',gap:12}}>
+                    <div style={{flex:1,fontSize:14,fontWeight:600,color:'#1E293B',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.nombre}</div>
+                    <div style={{fontSize:20,fontWeight:700,color:'#00AEEF',fontFamily:'DM Mono,monospace',minWidth:36,textAlign:'center'}}>{s.hoy}</div>
+                    <div style={{fontSize:20,fontWeight:700,color:'#7C3AED',fontFamily:'DM Mono,monospace',minWidth:48,textAlign:'center'}}>{s.total}</div>
+                  </div>
+                ))}
+              </div>
+        }
       </div>
     </div>
   )
@@ -1132,8 +1204,6 @@ function AdminScreen({ user, onBack, showToast }) {
       </div>
 
       <div className="ig-content">
-        <StatsPanel />
-
         <button className="ig-btn ig-btn-primary" onClick={() => setShowForm(true)} style={{marginBottom:4}}>
           + Nuevo usuario
         </button>
@@ -1198,7 +1268,7 @@ function AdminScreen({ user, onBack, showToast }) {
 // ROOT APP
 // ══════════════════════════════════════════
 function App() {
-  const [screen, setScreen] = useState('login') // login | home | form | detail | admin | admin
+  const [screen, setScreen] = useState('login') // login | home | form | detail | admin | stats
   const [user, setUser] = useState(null)
   const [datos, setDatos] = useState([])
   const [isOnline, setIsOnline] = useState(true)
@@ -1324,6 +1394,7 @@ function App() {
             onVerDato={(d) => { setDetailDato(d); setScreen('detail') }}
             onLogout={handleLogout}
             onAdmin={() => setScreen('admin')}
+            onStats={() => setScreen('stats')}
             onSync={() => showToast(isOnline ? '🔄 Sincronizando...' : '⚡ Sin conexión')}
           />
         )}
@@ -1346,6 +1417,9 @@ function App() {
             onBack={() => setScreen('home')}
             showToast={showToast}
           />
+        )}
+        {screen === 'stats' && (
+          <StatsScreen onBack={() => setScreen('home')} />
         )}
 
         <div className={`ig-toast ${toast.show ? 'show' : ''}`}>{toast.msg}</div>
