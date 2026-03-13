@@ -637,7 +637,7 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
     return new Date(d.ts).toDateString() === today
   }).length
   const pendientes = datos.filter(d => d.status === 'pending').length
-  const recientes = [...datos].sort((a, b) => b.ts - a.ts)
+  const recientes = datos // ya vienen ordenados del sheet, más reciente primero
 
   const cargarPagina = async (p) => {
     if (!isOnline) return
