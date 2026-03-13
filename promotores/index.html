@@ -32,7 +32,9 @@ function formatDateShort(ts, fechaStr, horaStr) {
       const n = new Date()
       return String(n.getDate()).padStart(2,'0') + '/' + String(n.getMonth()+1).padStart(2,'0') + '/' + String(n.getFullYear()).slice(-2)
     })()
-    return fechaStr.trim() === todayCheck ? `Hoy ${hora}` : fechaStr + ` ${hora}`
+    const fechaSolo = fechaStr.trim().substring(0,8)
+    const horaDisplay = hora || (fechaStr.trim().length > 8 ? fechaStr.trim().substring(9) : '')
+    return fechaSolo === todayCheck ? `Hoy ${horaDisplay}` : fechaStr.trim()
   }
   const d = new Date(ts)
   const today = new Date()
@@ -633,7 +635,7 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
     return d + '/' + m + '/' + y
   })()
   const hoy = datos.filter(d => {
-    if (d.fechaStr) return d.fechaStr.trim() === todayStr
+    if (d.fechaStr) return d.fechaStr.trim().substring(0,8) === todayStr
     return new Date(d.ts).toDateString() === today
   }).length
   const pendientes = datos.filter(d => d.status === 'pending').length
