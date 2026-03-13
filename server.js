@@ -35,7 +35,7 @@ app.get(/^\/promotores\/.*$/, (req, res) => {
 // });
 
 // Escuchar en el puerto 80
-const PORT = 9006;
+const PORT = 3050;
 app.listen(PORT, () => {
     console.log(`\n🚀 Servidor corriendo en el puerto ${PORT}`);
     console.log(`✅ App de promotores: http://localhost/promotores`);
