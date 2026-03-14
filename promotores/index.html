@@ -636,14 +636,14 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
     return d + '/' + m + '/' + y
   })()
 
-  useEffect(() => {
-    if (!isOnline) return
-    const nombreHoja = ((user.apellido || '') + ' ' + (user.nombre || '')).trim().toUpperCase()
-    fetch(SHEETS_URL + '?action=getCierre&hoja=' + encodeURIComponent(nombreHoja) + '&fecha=' + todayStr)
-      .then(r => r.json())
-      .then(d => { if (d.cerrado) setDiaCerrado(true) })
-      .catch(() => {})
-  }, [isOnline])
+useEffect(() => {
+  if (!isOnline) return
+  const nombreHoja = ((user.apellido || '') + ' ' + (user.nombre || '')).trim().toUpperCase()
+  fetch(SHEETS_URL + '?action=getCierre&hoja=' + encodeURIComponent(nombreHoja) + '&fecha=' + todayStr)
+    .then(r => r.json())
+    .then(d => { if (d.cerrado) setDiaCerrado(true) })
+    .catch(() => {})
+}, [])
   
   const hoy = datos.filter(d => {
     if (d.fechaStr) return d.fechaStr.trim().substring(0,8) === todayStr
