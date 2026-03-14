@@ -1105,7 +1105,7 @@ function DetailScreen({ dato, onBack }) {
 
         {dato.numero && (
           <div style={{display:'flex', gap:10}}>
-            
+            <a
               href={'tel:0' + dato.numero}
               style={{
                 flex:1, padding:'14px', borderRadius:10,
@@ -1117,7 +1117,7 @@ function DetailScreen({ dato, onBack }) {
               }}>
               📞 Llamar
             </a>
-            
+            <a
               href={'https://wa.me/549' + dato.numero}
               target="_blank"
               rel="noopener noreferrer"
