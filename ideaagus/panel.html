@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | Igualdad Salud</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    /* Animación para el modal */
+    .fade-in { animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const API_BASE = '/api/auth';
+    const { useState, useEffect, useMemo } = React;
+
+    // --- ICONOS SVG ---
+    const IconUsers = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>;
+    const IconShield = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>;
+    const IconLogout = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>;
+    const IconTrash = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>;
+    
+    // Iconos para la ordenación
+    const IconSortUp = () => <svg className="w-3.5 h-3.5 ml-1 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7"></path></svg>;
+    const IconSortDown = () => <svg className="w-3.5 h-3.5 ml-1 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"></path></svg>;
+    const IconSortNeutral = () => <svg className="w-3.5 h-3.5 ml-1 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"></path></svg>;
+
+    // --- COMPONENTE LOGIN ---
+    function Login({ onLogin }) {
+      const [user, setUser] = useState('');
+      const [pass, setPass] = useState('');
+      const [err, setErr] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true); setErr('');
+        try {
+          const res = await fetch(API_BASE + '/login', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario: user, pass })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || 'Error de acceso');
+          if (!data.esAdmin) throw new Error('Acceso denegado. Se requiere cuenta de Administrador.');
+          onLogin(data);
+        } catch (error) {
+          setErr(error.message);
+        }
+        setLoading(false);
+      };
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
+          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-slate-100">
+            <div className="text-center mb-8">
+              <div className="mx-auto w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/30 mb-4">
+                <IconShield />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800">Panel de Control</h2>
+              <p className="text-slate-500 text-sm mt-1">Acceso exclusivo para administradores</p>
+            </div>
+            {err && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-6 border border-red-100">{err}</div>}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Usuario</label>
+                <input required type="text" className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all" value={user} onChange={e=>setUser(e.target.value)} placeholder="admin" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                <input required type="password" className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" />
+              </div>
+              <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors shadow-md disabled:opacity-70">
+                {loading ? 'Verificando...' : 'Ingresar al sistema'}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // --- COMPONENTE DASHBOARD ---
+    function Dashboard({ session, onLogout }) {
+      const [users, setUsers] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [showModal, setShowModal] = useState(false);
+      const [formData, setFormData] = useState({ nombre: '', apellido: '', usuario: '', pass: '', esAdmin: false });
+      const [toast, setToast] = useState('');
+      
+      // Estado para la ordenación de la tabla
+      const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'asc' });
+
+      const fetchUsers = async () => {
+        try {
+          const res = await fetch(API_BASE + '/users', { headers: { 'Authorization': `Bearer ${session.token}` } });
+          const data = await res.json();
+          if (data.ok) setUsers(data.usuarios);
+        } catch (e) { console.error(e); }
+        setLoading(false);
+      };
+
+      useEffect(() => { fetchUsers(); }, []);
+
+      const showMsg = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+      const toggleStatus = async (user) => {
+        if(user.usuario === session.usuario) return showMsg('No puedes desactivarte a ti mismo');
+        try {
+          await fetch(`${API_BASE}/users/${user.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.token}` },
+            body: JSON.stringify({ activo: !user.activo })
+          });
+          setUsers(users.map(u => u.id === user.id ? { ...u, activo: !u.activo } : u));
+          showMsg(user.activo ? 'Usuario desactivado' : 'Usuario activado');
+        } catch (e) { showMsg('Error al actualizar'); }
+      };
+
+      const deleteUser = async (user) => {
+        if(user.esAdmin) return showMsg('No se puede eliminar a un administrador');
+        if(!window.confirm(`¿Eliminar definitivamente a ${user.nombre}?`)) return;
+        try {
+          await fetch(`${API_BASE}/users/${user.id}`, {
+            method: 'DELETE', headers: { 'Authorization': `Bearer ${session.token}` }
+          });
+          setUsers(users.filter(u => u.id !== user.id));
+          showMsg('Usuario eliminado');
+        } catch (e) { showMsg('Error al eliminar'); }
+      };
+
+      const handleCreate = async (e) => {
+        e.preventDefault();
+        try {
+          const res = await fetch(API_BASE + '/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.token}` },
+            body: JSON.stringify(formData)
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail);
+          setShowModal(false);
+          setFormData({ nombre: '', apellido: '', usuario: '', pass: '', esAdmin: false });
+          fetchUsers();
+          showMsg('Usuario creado exitosamente');
+        } catch (e) { alert(e.message); }
+      };
+
+      // --- LÓGICA DE ORDENACIÓN ---
+      const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+          direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+      };
+
+      const sortedUsers = useMemo(() => {
+        let sortableUsers = [...users];
+        sortableUsers.sort((a, b) => {
+          let valA = a[sortConfig.key];
+          let valB = b[sortConfig.key];
+
+          // Manejo especial para el nombre completo
+          if (sortConfig.key === 'nombre') {
+            valA = `${a.nombre} ${a.apellido}`.toLowerCase();
+            valB = `${b.nombre} ${b.apellido}`.toLowerCase();
+          }
+
+          // Manejo para strings en general (como el usuario)
+          if (typeof valA === 'string') valA = valA.toLowerCase();
+          if (typeof valB === 'string') valB = valB.toLowerCase();
+
+          if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+        });
+        return sortableUsers;
+      }, [users, sortConfig]);
+
+      const SortIndicator = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) return <IconSortNeutral />;
+        return sortConfig.direction === 'asc' ? <IconSortUp /> : <IconSortDown />;
+      };
+
+      // Cálculos para las tarjetas
+      const stats = {
+        total: users.length,
+        activos: users.filter(u => u.activo).length,
+        admins: users.filter(u => u.esAdmin).length
+      };
+
+      return (
+        <div className="min-h-screen bg-slate-50">
+          {/* Top Navbar */}
+          <nav className="bg-white border-b border-slate-200 sticky top-0 z-30">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between h-16">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white"><IconShield /></div>
+                  <span className="text-xl font-bold text-slate-800 tracking-tight">Igualdad<span className="text-blue-600">Salud</span> Admin</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="hidden md:block text-sm text-right">
+                    <p className="font-semibold text-slate-800">{session.nombre_completo}</p>
+                    <p className="text-slate-500 text-xs">Administrador</p>
+                  </div>
+                  <button onClick={onLogout} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Cerrar sesión">
+                    <IconLogout />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </nav>
+
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            
+            {/* Header y Botón */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900">Gestión de Usuarios</h1>
+                <p className="text-slate-500 text-sm mt-1">Administra los promotores y sus accesos al sistema.</p>
+              </div>
+              <button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2">
+                <IconUsers /> Nuevo Usuario
+              </button>
+            </div>
+
+            {/* Tarjetas de Estadísticas */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><IconUsers /></div>
+                <div><p className="text-sm font-medium text-slate-500">Total Usuarios</p><p className="text-2xl font-bold text-slate-800">{stats.total}</p></div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div><p className="text-sm font-medium text-slate-500">Promotores Activos</p><p className="text-2xl font-bold text-slate-800">{stats.activos}</p></div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center text-purple-600"><IconShield /></div>
+                <div><p className="text-sm font-medium text-slate-500">Administradores</p><p className="text-2xl font-bold text-slate-800">{stats.admins}</p></div>
+              </div>
+            </div>
+
+            {/* Tabla Principal */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse select-none">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                      <th className="px-6 py-4 cursor-pointer group hover:bg-slate-100 transition-colors" onClick={() => handleSort('nombre')}>
+                        <div className="flex items-center">
+                          Nombre / ID <SortIndicator columnKey="nombre" />
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 cursor-pointer group hover:bg-slate-100 transition-colors" onClick={() => handleSort('usuario')}>
+                        <div className="flex items-center">
+                          Credenciales <SortIndicator columnKey="usuario" />
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 cursor-pointer group hover:bg-slate-100 transition-colors" onClick={() => handleSort('esAdmin')}>
+                        <div className="flex items-center">
+                          Rol <SortIndicator columnKey="esAdmin" />
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 cursor-pointer group hover:bg-slate-100 transition-colors" onClick={() => handleSort('activo')}>
+                        <div className="flex items-center">
+                          Estado <SortIndicator columnKey="activo" />
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loading ? (
+                      <tr><td colSpan="5" className="text-center py-10 text-slate-500">Cargando datos...</td></tr>
+                    ) : sortedUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm">
+                              {u.nombre[0]}{u.apellido ? u.apellido[0] : ''}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-800">{u.nombre} {u.apellido}</p>
+                              <p className="text-xs text-slate-500">ID: {u.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-sm bg-slate-100 px-2 py-1 rounded text-slate-600">@{u.usuario}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {u.esAdmin 
+                            ? <span className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800"><IconShield/> Admin</span>
+                            : <span className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">Promotor</span>
+                          }
+                        </td>
+                        <td className="px-6 py-4">
+                          <button onClick={() => toggleStatus(u)} disabled={u.usuario === session.usuario} className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${u.activo ? 'bg-green-500' : 'bg-slate-300'} ${u.usuario === session.usuario ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${u.activo ? 'translate-x-5' : 'translate-x-0'}`}></span>
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {!u.esAdmin && (
+                            <button onClick={() => deleteUser(u)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                              <IconTrash />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </main>
+
+          {/* Toast Notification */}
+          {toast && (
+            <div className="fixed bottom-4 right-4 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-lg fade-in z-50 flex items-center gap-2">
+              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+              {toast}
+            </div>
+          )}
+
+          {/* Modal Crear Usuario */}
+          {showModal && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden fade-in">
+                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <h3 className="text-lg font-semibold text-slate-800">Crear Nuevo Usuario</h3>
+                  <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">&times;</button>
+                </div>
+                <form onSubmit={handleCreate} className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Nombre</label>
+                      <input required type="text" className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none" value={formData.nombre} onChange={e=>setFormData({...formData, nombre: e.target.value.toUpperCase()})} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Apellido</label>
+                      <input required type="text" className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none" value={formData.apellido} onChange={e=>setFormData({...formData, apellido: e.target.value.toUpperCase()})} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Usuario (Login)</label>
+                    <input required type="text" className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none" value={formData.usuario} onChange={e=>setFormData({...formData, usuario: e.target.value.toLowerCase().replace(/\s/g,'')})} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña temporal</label>
+                    <input required type="text" className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none" value={formData.pass} onChange={e=>setFormData({...formData, pass: e.target.value})} />
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <input type="checkbox" id="roleAdmin" className="w-4 h-4 text-blue-600 rounded border-slate-300" checked={formData.esAdmin} onChange={e=>setFormData({...formData, esAdmin: e.target.checked})} />
+                    <label htmlFor="roleAdmin" className="text-sm font-medium text-slate-700">Este usuario es Administrador</label>
+                  </div>
+                  <div className="pt-4 flex gap-3">
+                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-white border border-slate-300 text-slate-700 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors">Cancelar</button>
+                    <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm">Guardar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- APP PRINCIPAL ---
+    function App() {
+      const [session, setSession] = useState(null);
+
+      useEffect(() => {
+        const saved = localStorage.getItem('admin_panel_session');
+        if (saved) setSession(JSON.parse(saved));
+      }, []);
+
+      const handleLogin = (data) => {
+        localStorage.setItem('admin_panel_session', JSON.stringify(data));
+        setSession(data);
+      };
+
+      const handleLogout = () => {
+        localStorage.removeItem('admin_panel_session');
+        setSession(null);
+      };
+
+      return session ? <Dashboard session={session} onLogout={handleLogout} /> : <Login onLogin={handleLogin} />;
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
