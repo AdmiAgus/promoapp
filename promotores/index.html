@@ -627,9 +627,7 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
   const [pagina, setPagina] = useState(1)
   const [totalPaginas, setTotalPaginas] = useState(1)
   const [cargando, setCargando] = useState(false)
-  const [diaCerrado, setDiaCerrado] = useState(
-  localStorage.getItem('ig_dia_cerrado') === todayStr
-)
+  const [diaCerrado, setDiaCerrado] = useState(false)
   const todayStr = (() => {
     const n = new Date()
     const d = String(n.getDate()).padStart(2,'0')
@@ -637,6 +635,16 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
     const y = String(n.getFullYear()).slice(-2)
     return d + '/' + m + '/' + y
   })()
+
+  useEffect(() => {
+    if (!isOnline) return
+    const nombreHoja = ((user.apellido || '') + ' ' + (user.nombre || '')).trim().toUpperCase()
+    fetch(SHEETS_URL + '?action=getCierre&hoja=' + encodeURIComponent(nombreHoja) + '&fecha=' + todayStr)
+      .then(r => r.json())
+      .then(d => { if (d.cerrado) setDiaCerrado(true) })
+      .catch(() => {})
+  }, [isOnline])
+  
   const hoy = datos.filter(d => {
     if (d.fechaStr) return d.fechaStr.trim().substring(0,8) === todayStr
     return new Date(d.ts).toDateString() === today
