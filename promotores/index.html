@@ -1223,24 +1223,21 @@ function DetailScreen({ dato, onBack }) {
 function HojaDeRutaScreen({ user, onBack, showToast }) {
   const todayRuta = (() => {
     const n = new Date()
-    return String(n.getDate()).padStart(2,'0') + '/' + String(n.getMonth()+1).padStart(2,'0') + '/' + String(n.getFullYear()).slice(-2)
+    return n.toISOString().split('T')[0]
   })()
   const [fecha, setFecha] = useState(todayRuta)
   const [localidad, setLocalidad] = useState('')
-  const [localidadCustom, setLocalidadCustom] = useState('')
-  const [mostrarCustom, setMostrarCustom] = useState(false)
   const [empresas, setEmpresas] = useState([{ empresa: '', direccion: '', horario: '12:00' }])
   const [saving, setSaving] = useState(false)
   const [errs, setErrs] = useState({})
 
-  const localidadFinal = mostrarCustom ? localidadCustom : localidad
   const addEmpresa = () => setEmpresas(e => [...e, { empresa: '', direccion: '', horario: '12:00' }])
   const removeEmpresa = (i) => setEmpresas(e => e.filter((_, idx) => idx !== i))
   const setEmpresa = (i, k, v) => setEmpresas(e => e.map((x, idx) => idx === i ? {...x, [k]: v} : x))
 
   const validate = () => {
     const e = {}
-    if (!localidadFinal.trim()) e.localidad = 'Seleccioná una localidad'
+    if (!localidad.trim()) e.localidad = 'Ingresá una localidad'
     empresas.forEach((emp, i) => { if (!emp.empresa.trim()) e['empresa_' + i] = 'Requerido' })
     setErrs(e)
     return Object.keys(e).length === 0
@@ -1249,13 +1246,15 @@ function HojaDeRutaScreen({ user, onBack, showToast }) {
   const handleGuardar = async () => {
     if (!validate()) return
     setSaving(true)
+    const [y, m, d] = fecha.split('-')
+    const fechaFormateada = d + '/' + m + '/' + y.slice(-2)
     try {
       await fetch(RUTA_URL, {
         method: 'POST', mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           promotor: ((user.apellido || '') + ' ' + (user.nombre || '')).trim().toUpperCase(),
-          fecha, localidad: localidadFinal.trim(), empresas
+          fecha: fechaFormateada, localidad: localidad.trim(), empresas
         })
       })
       showToast('✓ Hoja de ruta enviada')
@@ -1283,37 +1282,21 @@ function HojaDeRutaScreen({ user, onBack, showToast }) {
           <div className="ig-form-section-title">📅 Datos generales</div>
           <div className="ig-field">
             <label>Fecha</label>
-            <input value={fecha} onChange={e => setFecha(e.target.value)} placeholder="dd/mm/aa" />
+            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
           </div>
           <div className="ig-field">
             <label>Localidad</label>
-            {!mostrarCustom
-              ? <>
-                  <select className={errs.localidad ? 'err' : ''} value={localidad}
-                    onChange={e => setLocalidad(e.target.value)}
-                    style={{color: localidad ? '#1E293B' : '#94A3B8'}}>
-                    <option value="">Seleccioná...</option>
-                    {LOCALIDADES.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                  {errs.localidad && <div className="ig-err-msg">{errs.localidad}</div>}
-                  <button onClick={() => setMostrarCustom(true)}
-                    style={{marginTop:8,background:'none',border:'none',color:'#00AEEF',
-                      fontFamily:'DM Sans,sans-serif',fontSize:13,fontWeight:600,cursor:'pointer',padding:0}}>
-                    + Otra localidad
-                  </button>
-                </>
-              : <>
-                  <input className={errs.localidad ? 'err' : ''} value={localidadCustom}
-                    onChange={e => setLocalidadCustom(e.target.value)}
-                    placeholder="Escribí la localidad" autoFocus />
-                  {errs.localidad && <div className="ig-err-msg">{errs.localidad}</div>}
-                  <button onClick={() => { setMostrarCustom(false); setLocalidadCustom('') }}
-                    style={{marginTop:8,background:'none',border:'none',color:'#94A3B8',
-                      fontFamily:'DM Sans,sans-serif',fontSize:13,fontWeight:600,cursor:'pointer',padding:0}}>
-                    ← Volver a la lista
-                  </button>
-                </>
-            }
+            <input
+              className={errs.localidad ? 'err' : ''}
+              value={localidad}
+              onChange={e => setLocalidad(e.target.value)}
+              placeholder="Escribí o seleccioná..."
+              list="lista-localidades"
+            />
+            <datalist id="lista-localidades">
+              {LOCALIDADES.map(l => <option key={l} value={l} />)}
+            </datalist>
+            {errs.localidad && <div className="ig-err-msg">{errs.localidad}</div>}
           </div>
         </div>
 
