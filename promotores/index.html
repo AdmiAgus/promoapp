@@ -615,7 +615,7 @@ function LoginScreen({ onLogin }) {
           {loading ? <><div className="ig-spinner ig-spinner-white"/>&nbsp;Ingresando...</> : 'Ingresar'}
         </button>
         <div style={{marginTop:16,fontSize:12,color:'#94A3B8',textAlign:'center'}}>
-          Demo: <b>promotor1</b> / <b>1234</b>
+          versión: <b>1.0</b>
         </div>
       </div>
     </div>
@@ -657,7 +657,19 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
     }
     setCargando(false)
   }
-
+const cerrarDia = async () => {
+  if (!window.confirm('¿Cerrar el día?')) return
+  await fetch(SHEETS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jid: 'CIERRE',
+      promotor: ((user.apellido || '') + ' ' + (user.nombre || '')).trim().toUpperCase()
+    })
+  })
+  showToast('✓ Día cerrado')
+}
   useEffect(() => { if (isOnline) cargarPagina(1) }, [isOnline])
 
   const badgeClass = (d) => {
@@ -714,7 +726,7 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
             <div className="ig-stats-cta-icon">📊</div>
             <div>
               <h3>Estadísticas</h3>
-              <p>Rendimiento del equipo</p>
+              <p>Rendimiento de los promotores</p>
             </div>
           </button>
         )}
@@ -726,7 +738,18 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
             : 'Sin conexión — guardando localmente'
           }</span>
         </div>
-
+<button
+  onClick={cerrarDia}
+  style={{
+    width:'100%', padding:'14px', borderRadius:12, border:'none',
+    background:'linear-gradient(135deg,#F59E0B,#D97706)',
+    color:'white', fontFamily:'DM Sans,sans-serif', fontSize:15,
+    fontWeight:600, cursor:'pointer', display:'flex',
+    alignItems:'center', justifyContent:'center', gap:8,
+    boxShadow:'0 4px 16px rgba(245,158,11,0.3)'
+  }}>
+  🔒 Cerrar el día
+</button>
         <div>
           <div className="ig-section-title">Últimos datos</div>
           {recientes.length === 0
@@ -957,20 +980,20 @@ function FormScreen({ onBack, onSave, isOnline }) {
           <div className="ig-field">
             <label>Nombre completo *</label>
             <input className={errs.nombre?'err':''} value={form.nombre}
-              onChange={e=>set('nombre',e.target.value)} placeholder="Ej: García Juan Carlos" />
+              onChange={e=>set('nombre',e.target.value)} placeholder="Alex" />
             {errs.nombre && <div className="ig-err-msg">{errs.nombre}</div>}
           </div>
           <div className="ig-field">
             <label>Teléfono *</label>
             <input className={errs.numero?'err':''} value={form.numero}
-              onChange={e=>set('numero',e.target.value)} placeholder="Ej: 3415678901"
+              onChange={e=>set('numero',e.target.value)} placeholder="1123456789"
               inputMode="numeric" maxLength={12} />
             {errs.numero && <div className="ig-err-msg">{errs.numero}</div>}
           </div>
           <div className="ig-field">
             <label>DNI</label>
             <input className={errs.dni?'err':''} value={form.dni}
-              onChange={e=>set('dni',e.target.value)} placeholder="Ej: 42156789"
+              onChange={e=>set('dni',e.target.value)} placeholder="40123456"
               inputMode="numeric" maxLength={8} />
             {renderDniStatus()}
             {errs.dni && <div className="ig-err-msg">{errs.dni}</div>}
@@ -981,15 +1004,15 @@ function FormScreen({ onBack, onSave, isOnline }) {
         <div className="ig-form-section">
           <div className="ig-form-section-title">🏥 Cobertura</div>
           <div className="ig-field">
-            <label>Obra social *</label>
+            <label>Obra social</label>
             <input className={errs.obraSocial?'err':''} value={form.obraSocial}
-              onChange={e=>set('obraSocial',e.target.value)} placeholder="Ej: OSDE, Swiss Medical..." />
+              onChange={e=>set('obraSocial',e.target.value)} placeholder="Osmedica, oschoca" />
             {errs.obraSocial && <div className="ig-err-msg">{errs.obraSocial}</div>}
           </div>
           <div className="ig-field">
             <label>Grupo familiar</label>
             <input value={form.grupoFliar} onChange={e=>set('grupoFliar',e.target.value)}
-              placeholder="Ej: Titular + cónyuge + 2 hijos" />
+              placeholder="2" />
           </div>
         </div>
 
@@ -999,7 +1022,7 @@ function FormScreen({ onBack, onSave, isOnline }) {
           <div className="ig-field">
             <label>Horario</label>
             <input value={form.horario} onChange={e=>set('horario',e.target.value)}
-              placeholder="Ej: Mañanas, después de 18hs..." />
+              placeholder="15hs, a la mañana..." />
           </div>
           <div className="ig-field">
             <label>Empresa</label>
@@ -1032,7 +1055,7 @@ function FormScreen({ onBack, onSave, isOnline }) {
           <div className="ig-field">
             <label>Observaciones</label>
             <textarea value={form.obs} onChange={e=>set('obs',e.target.value)}
-              placeholder="Notas adicionales..." />
+              placeholder="Observaciónes adicionales..." />
           </div>
         </div>
       </div>
@@ -1320,15 +1343,15 @@ const eliminarUsuario = async (u) => {
             {formErr && <div style={{background:'#FEE2E2',color:'#991B1B',borderRadius:8,padding:'10px 12px',fontSize:13,marginBottom:12}}>{formErr}</div>}
             <div className="ig-field">
               <label>Apellido</label>
-              <input value={form.apellido} onChange={e=>setForm(f=>({...f,apellido:e.target.value}))} placeholder="García" autoCapitalize="words" />
+              <input value={form.apellido} onChange={e=>setForm(f=>({...f,apellido:e.target.value}))} placeholder="Peralta" autoCapitalize="words" />
             </div>
             <div className="ig-field">
               <label>Nombre</label>
-              <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Juan" autoCapitalize="words" />
+              <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Alex" autoCapitalize="words" />
             </div>
             <div className="ig-field">
               <label>Usuario</label>
-              <input value={form.usuario} onChange={e=>setForm(f=>({...f,usuario:e.target.value}))} placeholder="juan.garcia" autoCapitalize="none" />
+              <input value={form.usuario} onChange={e=>setForm(f=>({...f,usuario:e.target.value}))} placeholder="alexp" autoCapitalize="none" />
             </div>
             <div className="ig-field" style={{marginBottom:20}}>
               <label>Contraseña</label>
