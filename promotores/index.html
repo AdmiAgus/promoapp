@@ -413,6 +413,22 @@ const css = `
   .ig-stats-cta h3 { font-size: 16px; font-weight: 700; font-family: 'DM Sans', sans-serif; }
   .ig-stats-cta p { font-size: 12px; opacity: 0.8; margin-top: 2px; font-family: 'DM Sans', sans-serif; }
 
+/* HOJA DE RUTA */
+  .ig-ruta-empresa {
+    background: white; border-radius: 14px; padding: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 10px;
+    border: 2px solid #E2E8F0;
+  }
+  .ig-ruta-empresa-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+  }
+  .ig-ruta-empresa-num { font-size: 11px; font-weight: 700; color: #00AEEF; text-transform: uppercase; letter-spacing: 0.6px; }
+  .ig-ruta-remove {
+    width: 28px; height: 28px; border: none; border-radius: 8px;
+    background: rgba(239,68,68,0.08); color: #EF4444;
+    cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;
+  }
+
   /* LOGIN ERR */
   .ig-login-err { background: #FEE2E2; color: #991B1B; border-radius: 8px; padding: 10px 12px; font-size: 13px; font-weight: 500; margin-bottom: 12px; }
 `
@@ -468,6 +484,10 @@ async function enviarASheets(dato, usuario) {
 
 const MOCK_DNI = false
 
+const RUTA_URL = 'https://script.google.com/macros/s/AKfycbw45il1wSnrPscGwR3a5V9V2EcY5J7TP66IXj1v5aB14KJdcNYEK7S-U23yS5Pt0svN/exec'
+const LOCALIDADES = ["Adrogué","Agronomía","Almagro","Avellaneda","Balvanera","Banfield","Barrio Norte","Barracas","Belgrano","Berazategui","Berisso","Bernal","Boedo","Burzaco","Caballito","Castelar","Centro","Chacarita","City Bell","Claypole","Coghlan","Colegiales","Congreso","Constitución","Don Bosco","Don Orione","El Palomar","Ensenada","Ezpeleta","Florencio Varela","Flores","Florida","Floresta","Gerli","Glew","González Catán","Grand Bourg","Gregorio de Laferrere","Guernica","Haedo","Hurlingham","Ingeniero Maschwitz","Isidro Casanova","Ituzaingó","José C. Paz","José Mármol","La Boca","La Paternal","La Plata","Lanús","Lavallol","Libertad","Liniers","Lomas de Zamora","Longchamps","Los Polvorines","Malvinas Argentinas","Mar del Plata","Marcos Paz","Mataderos","Merlo","Microcentro","Monserrat","Monte Castro","Monte Grande","Moreno","Morón","Munro","Muñiz","Nueva Pompeya","Núñez","Olivos","Once","Palermo","Palermo Hollywood","Palermo Soho","Parque Avellaneda","Parque Chacabuco","Parque Chas","Parque Patricios","Pilar","Puerto Madero","Quilmes","Rafael Castillo","Ramos Mejía","Ranelagh","Recoleta","Remedios de Escalada","Retiro","Saavedra","San Antonio de Padua","San Cristóbal","San Fernando","San Isidro","San Justo","San Miguel","San Nicolás","San Telmo","San Vicente","Sarandí","Temperley","Tigre","Tribunales","Turdera","Valentín Alsina","Vélez Sársfield","Vernon","Vicente López","Villa Ballester","Villa Crespo","Villa del Parque","Villa Devoto","Villa Domínico","Villa Gral. Mitre","Villa Lugano","Villa Luro","Villa Lynch","Villa Maipú","Villa Ortúzar","Villa Pueyrredón","Villa Real","Villa Riachuelo","Villa Santa Rita","Villa Soldati","Villa Urquiza","Wilde"]
+const HORARIOS = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00"]
+    
 
 async function leerDatosDeSheet(nombreHoja, pagina) {
   try {
@@ -622,7 +642,7 @@ function LoginScreen({ onLogin }) {
   )
 }
 
-function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLogout, onSync, onAdmin, onStats }) {
+function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLogout, onSync, onAdmin, onStats, onRuta }) {
   const today = new Date().toDateString()
   const [pagina, setPagina] = useState(1)
   const [totalPaginas, setTotalPaginas] = useState(1)
@@ -1184,7 +1204,143 @@ function DetailScreen({ dato, onBack }) {
   )
 }
 
+function HojaDeRutaScreen({ user, onBack, showToast }) {
+  const todayRuta = (() => {
+    const n = new Date()
+    return String(n.getDate()).padStart(2,'0') + '/' + String(n.getMonth()+1).padStart(2,'0') + '/' + String(n.getFullYear()).slice(-2)
+  })()
+  const [fecha, setFecha] = useState(todayRuta)
+  const [localidad, setLocalidad] = useState('')
+  const [localidadCustom, setLocalidadCustom] = useState('')
+  const [mostrarCustom, setMostrarCustom] = useState(false)
+  const [empresas, setEmpresas] = useState([{ empresa: '', direccion: '', horario: '12:00' }])
+  const [saving, setSaving] = useState(false)
+  const [errs, setErrs] = useState({})
 
+  const localidadFinal = mostrarCustom ? localidadCustom : localidad
+  const addEmpresa = () => setEmpresas(e => [...e, { empresa: '', direccion: '', horario: '12:00' }])
+  const removeEmpresa = (i) => setEmpresas(e => e.filter((_, idx) => idx !== i))
+  const setEmpresa = (i, k, v) => setEmpresas(e => e.map((x, idx) => idx === i ? {...x, [k]: v} : x))
+
+  const validate = () => {
+    const e = {}
+    if (!localidadFinal.trim()) e.localidad = 'Seleccioná una localidad'
+    empresas.forEach((emp, i) => { if (!emp.empresa.trim()) e['empresa_' + i] = 'Requerido' })
+    setErrs(e)
+    return Object.keys(e).length === 0
+  }
+
+  const handleGuardar = async () => {
+    if (!validate()) return
+    setSaving(true)
+    try {
+      await fetch(RUTA_URL, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          promotor: ((user.apellido || '') + ' ' + (user.nombre || '')).trim().toUpperCase(),
+          fecha, localidad: localidadFinal.trim(), empresas
+        })
+      })
+      showToast('✓ Hoja de ruta enviada')
+      onBack()
+    } catch { showToast('⚠ Error al enviar') }
+    setSaving(false)
+  }
+
+  return (
+    <div>
+      <div className="ig-topbar">
+        <div className="ig-topbar-inner">
+          <div className="ig-topbar-left">
+            <TopbarLogo />
+            <div>
+              <div className="ig-topbar-sub">Igualdad Salud</div>
+              <h2>Hoja de ruta</h2>
+            </div>
+          </div>
+          <button className="ig-topbar-btn" onClick={onBack}><IconBack /></button>
+        </div>
+      </div>
+      <div className="ig-content">
+        <div className="ig-form-section">
+          <div className="ig-form-section-title">📅 Datos generales</div>
+          <div className="ig-field">
+            <label>Fecha</label>
+            <input value={fecha} onChange={e => setFecha(e.target.value)} placeholder="dd/mm/aa" />
+          </div>
+          <div className="ig-field">
+            <label>Localidad</label>
+            {!mostrarCustom
+              ? <>
+                  <select className={errs.localidad ? 'err' : ''} value={localidad}
+                    onChange={e => setLocalidad(e.target.value)}
+                    style={{color: localidad ? '#1E293B' : '#94A3B8'}}>
+                    <option value="">Seleccioná...</option>
+                    {LOCALIDADES.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                  {errs.localidad && <div className="ig-err-msg">{errs.localidad}</div>}
+                  <button onClick={() => setMostrarCustom(true)}
+                    style={{marginTop:8,background:'none',border:'none',color:'#00AEEF',
+                      fontFamily:'DM Sans,sans-serif',fontSize:13,fontWeight:600,cursor:'pointer',padding:0}}>
+                    + Otra localidad
+                  </button>
+                </>
+              : <>
+                  <input className={errs.localidad ? 'err' : ''} value={localidadCustom}
+                    onChange={e => setLocalidadCustom(e.target.value)}
+                    placeholder="Escribí la localidad" autoFocus />
+                  {errs.localidad && <div className="ig-err-msg">{errs.localidad}</div>}
+                  <button onClick={() => { setMostrarCustom(false); setLocalidadCustom('') }}
+                    style={{marginTop:8,background:'none',border:'none',color:'#94A3B8',
+                      fontFamily:'DM Sans,sans-serif',fontSize:13,fontWeight:600,cursor:'pointer',padding:0}}>
+                    ← Volver a la lista
+                  </button>
+                </>
+            }
+          </div>
+        </div>
+
+        {empresas.map((emp, i) => (
+          <div key={i} className="ig-ruta-empresa">
+            <div className="ig-ruta-empresa-header">
+              <span className="ig-ruta-empresa-num">Empresa {i + 1}</span>
+              {empresas.length > 1 && (
+                <button className="ig-ruta-remove" onClick={() => removeEmpresa(i)}>✕</button>
+              )}
+            </div>
+            <div className="ig-field">
+              <label>Empresa *</label>
+              <input className={errs['empresa_' + i] ? 'err' : ''} value={emp.empresa}
+                onChange={e => setEmpresa(i, 'empresa', e.target.value)} placeholder="Nombre de la empresa" />
+              {errs['empresa_' + i] && <div className="ig-err-msg">{errs['empresa_' + i]}</div>}
+            </div>
+            <div className="ig-field">
+              <label>Dirección</label>
+              <input value={emp.direccion} onChange={e => setEmpresa(i, 'direccion', e.target.value)} placeholder="Calle 123" />
+            </div>
+            <div className="ig-field">
+              <label>Horario</label>
+              <select value={emp.horario} onChange={e => setEmpresa(i, 'horario', e.target.value)}>
+                {HORARIOS.map(h => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+          </div>
+        ))}
+
+        <button className="ig-btn ig-btn-secondary" onClick={addEmpresa} style={{marginBottom:4}}>
+          + Agregar empresa
+        </button>
+      </div>
+      <div className="ig-floating">
+        <button className="ig-btn ig-btn-success" onClick={handleGuardar} disabled={saving}>
+          {saving ? <><div className="ig-spinner ig-spinner-white"/> Enviando...</> : '✓ Guardar hoja de ruta'}
+        </button>
+      </div>
+    </div>
+  )
+}
+    
 function StatsScreen({ onBack }) {
   const [stats, setStats] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1395,7 +1551,7 @@ const eliminarUsuario = async (u) => {
 // ROOT APP
 // ══════════════════════════════════════════
 function App() {
-  const [screen, setScreen] = useState('login') // login | home | form | detail | admin | stats
+const [screen, setScreen] = useState('login') // login | home | form | detail | admin | stats | ruta
   const [user, setUser] = useState(null)
   const [datos, setDatos] = useState([])
   const [isOnline, setIsOnline] = useState(true)
@@ -1524,6 +1680,8 @@ function App() {
             onLogout={handleLogout}
             onAdmin={() => setScreen('admin')}
             onStats={() => setScreen('stats')}
+            onRuta={() => setScreen('ruta')}
+
             onSync={() => showToast(isOnline ? '🔄 Sincronizando...' : '⚡ Sin conexión')}
           />
         )}
@@ -1549,6 +1707,13 @@ function App() {
         )}
         {screen === 'stats' && (
           <StatsScreen onBack={() => setScreen('home')} />
+        )}
+                {screen === 'ruta' && (
+          <HojaDeRutaScreen
+            user={user}
+            onBack={() => setScreen('home')}
+            showToast={showToast}
+          />
         )}
 
         <div className={`ig-toast ${toast.show ? 'show' : ''}`}>{toast.msg}</div>
