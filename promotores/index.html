@@ -639,7 +639,7 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
 useEffect(() => {
   if (!isOnline) return
   const nombreHoja = ((user.apellido || '') + ' ' + (user.nombre || '')).trim().toUpperCase()
-  fetch(SHEETS_URL + '?action=getCierre&hoja=' + encodeURIComponent(nombreHoja) + '&fecha=' + todayStr)
+fetch(SHEETS_URL + '?action=getCierre&hoja=' + encodeURIComponent(nombreHoja) + '&fecha=' + encodeURIComponent(todayStr))
     .then(r => r.json())
     .then(d => { if (d.cerrado) setDiaCerrado(true) })
     .catch(() => {})
