@@ -1427,11 +1427,13 @@ function App() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('ig_session')
-    setUser(null)
-    setDatos([])
-    setScreen('login')
-  }
+  if (!window.confirm('¿Cerrar sesión?')) return
+  localStorage.removeItem('ig_session')
+  setUser(null)
+  setDatos([])
+  setScreen('login')
+}
+
 
   const handleSave = async (dato) => {
     const datoConUsuario = { ...dato, usuario: user?.usuario }
