@@ -1180,17 +1180,29 @@ function AdminScreen({ user, onBack, showToast }) {
 
   useEffect(() => { cargarUsuarios() }, [])
 
-  const toggleUsuario = async (u) => {
-    try {
-      await fetch(`${AUTH_BASE}/users/${u.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ activo: !u.activo })
-      })
-      setUsuarios(prev => prev.map(x => x.id === u.id ? {...x, activo: !x.activo} : x))
-      showToast(u.activo ? '⛔ Usuario desactivado' : '✓ Usuario activado')
-    } catch { showToast('⚠ Error al actualizar') }
-  }
+const toggleUsuario = async (u) => {
+  try {
+    await fetch(`${AUTH_BASE}/users/${u.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ activo: !u.activo })
+    })
+    setUsuarios(prev => prev.map(x => x.id == u.id ? {...x, activo: !x.activo} : x))
+    showToast(u.activo ? '⛔ Usuario desactivado' : '✓ Usuario activado')
+  } catch { showToast('⚠ Error al actualizar') }
+}
+const eliminarUsuario = async (u) => {
+  if (!window.confirm('¿Eliminar a ' + u.apellido + ' ' + u.nombre + '?')) return
+  try {
+    await fetch(`${AUTH_BASE}/users/${u.id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    setUsuarios(prev => prev.filter(x => x.id != u.id))
+    showToast('✓ Usuario eliminado')
+  } catch { showToast('⚠ Error al eliminar') }
+}
+
 
   const crearUsuario = async () => {
     const ap = form.apellido.trim().toUpperCase()
@@ -1255,6 +1267,16 @@ function AdminScreen({ user, onBack, showToast }) {
                         onClick={() => toggleUsuario(u)}
                         disabled={u.usuario === user.usuario}
                       />
+                      {!u.esAdmin && u.usuario !== user.usuario && (
+  <button
+    onClick={() => eliminarUsuario(u)}
+    style={{
+      width:32, height:32, border:'none', borderRadius:8,
+      background:'rgba(239,68,68,0.08)', color:'#EF4444',
+      cursor:'pointer', fontSize:15, display:'flex',
+      alignItems:'center', justifyContent:'center', flexShrink:0
+    }}>✕</button>
+)}
                     </div>
                   ))
               }
