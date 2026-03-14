@@ -697,7 +697,7 @@ function HomeScreen({ user, datos, setDatos, isOnline, onNuevo, onVerDato, onLog
 
         <button className="ig-cta" onClick={onNuevo}>
           <h3>Nuevo dato</h3>
-          <p>Cargar cliente nuevo</p>
+          <p>Cargar afiliado nuevo</p>
         </button>
 
         {user.esAdmin && (
@@ -953,7 +953,7 @@ function FormScreen({ onBack, onSave, isOnline }) {
       <div className="ig-content">
         {/* CLIENTE */}
         <div className="ig-form-section">
-          <div className="ig-form-section-title">👤 Cliente</div>
+          <div className="ig-form-section-title">👤 Afiliado</div>
           <div className="ig-field">
             <label>Nombre completo *</label>
             <input className={errs.nombre?'err':''} value={form.nombre}
@@ -1102,12 +1102,41 @@ function DetailScreen({ dato, onBack }) {
             </div>
           ))}
         </div>
+
+        {dato.numero && (
+          <div style={{display:'flex', gap:10}}>
+            
+              href={'tel:0' + dato.numero}
+              style={{
+                flex:1, padding:'14px', borderRadius:10,
+                background:'linear-gradient(135deg,#10B981,#059669)',
+                color:'white', fontFamily:'DM Sans,sans-serif', fontSize:15,
+                fontWeight:600, textAlign:'center', textDecoration:'none',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                boxShadow:'0 4px 16px rgba(16,185,129,0.3)'
+              }}>
+              📞 Llamar
+            </a>
+            
+              href={'https://wa.me/549' + dato.numero}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                flex:1, padding:'14px', borderRadius:10,
+                background:'linear-gradient(135deg,#25D366,#128C7E)',
+                color:'white', fontFamily:'DM Sans,sans-serif', fontSize:15,
+                fontWeight:600, textAlign:'center', textDecoration:'none',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                boxShadow:'0 4px 16px rgba(37,211,102,0.3)'
+              }}>
+              💬 WhatsApp
+            </a>
+          </div>
+        )}
       </div>
     </div>
   )
 }
-
-
 
 
 function StatsScreen({ onBack }) {
